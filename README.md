@@ -8,6 +8,8 @@ Amacımız, çelik üretiminde yüzey kusurlarını otomatik olarak tespit eden 
 
 ---
 
+![alt text](image.png)
+
 ## 🏗️ Mimari Yaklaşım
 
 Proje, gerçek üretim hattındaki kalite kontrol mantığını taklit eden çok katmanlı bir yapıya sahiptir:
@@ -83,7 +85,7 @@ steel-defect-detection/
 
 ---
 
-## 📌 gaynak
+## 📌 Kaynak
 
 - Kaggle Competition: [Severstal: Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
 - Endüstriyel kalite kontrol literatürü
