@@ -1,0 +1,74 @@
+# =========================
+# Python Temel
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# =========================
+# Jupyter / Notebook
+# =========================
+.ipynb_checkpoints
+*.ipynb_convert
+.notebooks_cache/
+
+# =========================
+# Sanal Ortamlar
+# =========================
+.env
+.venv
+env/
+venv/
+ENV/
+.conda/
+*.conda
+*.virtualenv
+
+# =========================
+# IDE Dosyaları
+# =========================
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# =========================
+# Loglar / Çıktılar
+# =========================
+*.log
+logs/
+outputs/
+wandb/
+mlruns/
+*.csv
+*.json
+
+# =========================
+# Model / Ağırlık Dosyaları
+# =========================
+*.pth
+*.h5
+*.onnx
+*.pt
+*.ckpt
+
+# =========================
+# Veriler
+# =========================
+data/
+!data/README.md   # data klasörünü tut ama içini ignore et
+*.zip
+*.tar
+*.tar.gz
+
+# =========================
+# Sistem Dosyaları
+# =========================
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+# Temel
+numpy
+pandas
+matplotlib
+tqdm
+scikit-learn
+
+# Görüntü işleme
+opencv-python-headless
+albumentations
+
+# PyTorch ekosistemi
+torch
+torchvision
+segmentation-models-pytorch
