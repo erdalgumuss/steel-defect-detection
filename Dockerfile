@@ -3,6 +3,7 @@ FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
 
 # Çalışma dizini oluştur
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 # Sisteme temel paketleri yükle
 RUN apt-get update && apt-get install -y \

@@ -8,7 +8,7 @@ Amacımız, çelik üretiminde yüzey kusurlarını otomatik olarak tespit eden 
 
 ---
 
-![alt text](image.png)
+![Pipeline](image.png)
 
 ## 🏗️ Mimari Yaklaşım
 
@@ -54,7 +54,7 @@ Proje, gerçek üretim hattındaki kalite kontrol mantığını taklit eden çok
 ## 📊 Beklenen Kazanımlar
 
 - **Bootcamp**: Güçlü, endüstriyel seviyede bir proje çıktısı.
-- **Ekip için**: Modern derin öğrenme mimarilerinde (U-Net, EfficientNet, Transformer, Semi-supervised) deneyim.
+- **Eğitim**: Modern derin öğrenme mimarilerinde (U-Net, EfficientNet, Transformer, Semi-supervised) deneyim.
 - **Gelecek**: Aynı pipeline, başka sektörlere (plastik, cam, taş yünü) kolayca uyarlanabilir.
 
 ---
@@ -63,25 +63,33 @@ Proje, gerçek üretim hattındaki kalite kontrol mantığını taklit eden çok
 
 - **PyTorch, segmentation-models-pytorch**
 - **Albumentations** (data augmentation)
+- **Matplotlib/Seaborn** (EDA & görselleştirme)
 - **WandB / TensorBoard** (deney takibi)
-- **Gradio / Streamlit** (demo)
+- **Gradio / Streamlit** (demo arayüz)
 
 ---
 
 ## 📂 Repo Yapısı
 
+```
 steel-defect-detection/
 │── data/ # ham ve işlenmiş veri
 │── notebooks/ # EDA ve prototipler
 │── src/
-│ ├── data/ # data loader, preprocess
+│ ├── data/ # dataset, transforms
 │ ├── models/ # classifier & segmenter
-│ ├── training/ # training loop, metrics
+│ ├── training/ # training loop, metrics, losses
 │ ├── inference/ # tahmin, postprocessing
+│── scripts/
+│ ├── preprocess.py # RLE -> mask, split oluşturma
+│ ├── check_dataset.py # görsel kontrol
+│ ├── train_baseline.py # baseline eğitim scripti
 │── experiments/ # farklı denemeler
-│── outputs/ # submission.csv, görseller
+│── outputs/ # checkpoint, loss/dice grafikleri, submission
 │── requirements.txt # bağımlılıklar
+│── Dockerfile # ortam kurulumu
 │── README.md # proje açıklaması
+```
 
 ---
 
