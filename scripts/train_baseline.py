@@ -1,3 +1,4 @@
+# scripts/train_baseline.py
 import os
 import yaml
 import torch
@@ -13,13 +14,13 @@ from src.training.losses import BCEDiceLoss
 from src.training.metrics import dice_mean
 
 
-
 def load_config(path="config.yaml"):
     with open(path, "r") as f:
         config = yaml.safe_load(f)
     if config is None:
         raise ValueError(f"Config dosyası boş: {path}")
     return config
+
 
 def train_one_epoch(model, loader, optimizer, criterion, device):
     model.train()
@@ -98,6 +99,9 @@ def main():
     num_epochs = config["training"]["epochs"]
     history = {"train_loss": [], "val_loss": [], "val_dice": []}
 
+    best_dice = 0.0
+    os.makedirs(config["training"]["checkpoint_dir"], exist_ok=True)
+
     for epoch in range(num_epochs):
         print(f"\nEpoch {epoch+1}/{num_epochs}")
         train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
@@ -109,10 +113,18 @@ def main():
 
         print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Dice: {val_dice:.4f}")
 
-    # Çıktılar
-    os.makedirs(config["training"]["checkpoint_dir"], exist_ok=True)
-    torch.save(model.state_dict(), os.path.join(config["training"]["checkpoint_dir"], "unet_baseline.pth"))
+        # 🔹 Her epoch sonrası checkpoint kaydet
+        ckpt_path = os.path.join(config["training"]["checkpoint_dir"], f"unet_epoch{epoch+1}.pth")
+        torch.save(model.state_dict(), ckpt_path)
 
+        # 🔹 En iyi model kaydı
+        if val_dice > best_dice:
+            best_dice = val_dice
+            best_path = os.path.join(config["training"]["checkpoint_dir"], "unet_best.pth")
+            torch.save(model.state_dict(), best_path)
+            print(f"[INFO] Yeni en iyi model kaydedildi (Val Dice: {best_dice:.4f})")
+
+    # Son grafikler
     plt.figure()
     plt.plot(history["train_loss"], label="Train Loss")
     plt.plot(history["val_loss"], label="Val Loss")
