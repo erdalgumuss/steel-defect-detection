@@ -6,33 +6,22 @@ import matplotlib.pyplot as plt
 import cv2
 
 from src.models.unet_effnet import UNet
-from src.data.transforms import get_val_transforms
-from src.data.dataset import SteelDefectDataset
 
 # --- helpers ---
-IMAGENET_MEAN = np.array([0.485, 0.456, 0.406])
-IMAGENET_STD  = np.array([0.229, 0.224, 0.225])
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 def denormalize_tensor(img_tensor):
-    """img_tensor: torch tensor (C,H,W) normalized with ImageNet mean/std.
-       returns HxWx3 numpy image in [0,1] floats."""
     img = img_tensor.cpu().numpy()
-    img = img.transpose(1,2,0)  # H,W,C
+    img = img.transpose(1,2,0)  
     img = (img * IMAGENET_STD) + IMAGENET_MEAN
     img = np.clip(img, 0.0, 1.0)
     return img
 
 def overlay_masks_on_image(image_rgb, masks, colors=None, alpha=0.5):
-    """
-    image_rgb: HxWx3 float [0,1]
-    masks: C x H x W numpy (0/1)
-    colors: list of rgb tuples (0-1)
-    returns: overlay image HxWx3 uint8
-    """
     H, W, _ = image_rgb.shape
     canvas = (image_rgb * 255).astype(np.uint8).copy()
     if colors is None:
-        # distinct colors for up to 4 classes
         colors = [(1,0,0), (0,1,0), (0,0,1), (1,1,0)]
     overlay = canvas.copy().astype(np.float32)
     for c in range(masks.shape[0]):
@@ -47,15 +36,10 @@ def overlay_masks_on_image(image_rgb, masks, colors=None, alpha=0.5):
     return overlay.astype(np.uint8)
 
 def visualize_and_save(image_tensor, pred_masks, out_path):
-    """
-    image_tensor: torch.Tensor (C,H,W) normalized
-    pred_masks: torch.Tensor or np.array (C,H,W) binary 0/1
-    """
     img = denormalize_tensor(image_tensor)
     masks_np = pred_masks.cpu().numpy() if torch.is_tensor(pred_masks) else pred_masks
     overlay = overlay_masks_on_image(img, masks_np, alpha=0.45)
 
-    # plot: original, overlay, per-class masks
     C = masks_np.shape[0]
     plt.figure(figsize=(4*(2+C), 4))
     plt.subplot(1, 2+C, 1)
@@ -83,50 +67,35 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Device:", device)
 
-    # model
     model = UNet(in_channels=3, out_channels=4).to(device)
     ckpt = "outputs/checkpoints/unet_best.pth"
     if not os.path.exists(ckpt):
         ckpt = "outputs/checkpoints/unet_baseline.pth"
     if not os.path.exists(ckpt):
-        raise FileNotFoundError(f"No checkpoint found at expected locations. Checked: outputs/checkpoints/unet_best.pth and unet_baseline.pth")
+        raise FileNotFoundError("No checkpoint found at expected locations")
     state = torch.load(ckpt, map_location=device)
     model.load_state_dict(state)
     model.eval()
     print("Loaded checkpoint:", ckpt)
 
-    # dataset: try val_mini.txt else val.txt
-    splits_dir = "data/processed/splits"
-    cand = os.path.join(splits_dir, "val_mini.txt")
-    if not os.path.exists(cand):
-        cand = os.path.join(splits_dir, "val.txt")
-    if not os.path.exists(cand):
-        raise FileNotFoundError(f"No val split found. Checked: {splits_dir}/*")
+    # Tek görsel
+    img_path = "data/raw/test_images/ff740a9be.jpg"
+    img_bgr = cv2.imread(img_path)
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-    dataset = SteelDefectDataset(
-        split_file=cand,
-        img_dir="data/raw/train_images",
-        mask_dir="data/processed/masks_png",
-        augmentations=get_val_transforms()
-    )
-
-    out_dir = "outputs/inference"
-    os.makedirs(out_dir, exist_ok=True)
-
-    num_to_run = min(5, len(dataset))
-    print(f"Running inference on {num_to_run} samples from {cand}")
+    img = img_rgb.astype(np.float32) / 255.0
+    img = (img - IMAGENET_MEAN) / IMAGENET_STD
+    img = torch.from_numpy(img.transpose(2,0,1)).unsqueeze(0).to(device).float()
 
     with torch.no_grad():
-        for idx in range(num_to_run):
-            image, _ = dataset[idx]                # image: tensor (C,H,W) normalized
-            inp = image.unsqueeze(0).to(device)
-            logits = model(inp)                    # (1,C,H,W)
-            probs = torch.sigmoid(logits)[0].cpu() # (C,H,W)
-            preds = (probs > 0.5).float()          # threshold; can tune
+        logits = model(img)
+        probs = torch.sigmoid(logits)[0].cpu()
+        preds = (probs > 0.5).float()
 
-            out_path = os.path.join(out_dir, f"pred_check_{idx}.png")
-            visualize_and_save(image, preds, out_path)
-            print("Saved ->", out_path)
+    os.makedirs("outputs/inference", exist_ok=True)
+    out_path = "outputs/inference/pred_single.png"
+    visualize_and_save(img.squeeze(0).cpu(), preds, out_path)
+    print("Saved ->", out_path)
 
 if __name__ == "__main__":
     main()

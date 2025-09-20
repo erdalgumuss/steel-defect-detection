@@ -12,7 +12,7 @@ training:
   device: "cpu" # cpu da yazabilirsin
   batch_size: 2
   num_workers: 0
-  epochs: 3 # 🔥 artık "epochs"
+  epochs: 10 # 🔥 artık "epochs"
   lr: 0.0001
   checkpoint_dir: "outputs/checkpoints"
 
