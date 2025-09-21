@@ -118,6 +118,8 @@ def main():
     # ------------------------
     # Trainer
     # ------------------------
+    visualize_out_dir = os.path.join(config["paths"]["outputs"], "visualizations")
+    
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -125,13 +127,14 @@ def main():
         metrics=metrics,
         train_loader=train_loader,
         val_loader=val_loader,
-        device=device,  # ✅ fix
+        device=device,
         use_amp=config["training"].get("use_amp", True),
-        out_dir=config["paths"]["outputs"],  # ✅ fix
+        out_dir=config["paths"]["outputs"],
         clip_grad_norm=config["training"].get("clip_grad_norm", None),
-        monitor="dice_mean",  # 🔥 hangi metrik en iyi modele göre seçilecek
+        monitor="dice_mean",
+        class_names=[f"class_{i+1}" for i in range(config["model"]["out_channels"])],
+        visualize_out_dir=visualize_out_dir,  # ✅ Yeni parametre
     )
-
     # ------------------------
     # Training Loop
     # ------------------------

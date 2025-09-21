@@ -38,14 +38,18 @@ class BCEDiceLoss(nn.Module):
                  pos_weight: Optional[torch.Tensor] = None,
                  bce_weight: float = 0.75,
                  dice_weight: float = 0.25,
-                 smooth: float = 1.0,
-                 out_channels: Optional[int] = None):
+                 smooth: float = 1.0):
         super().__init__()
 
-        # Eğer pos_weight bir tensor ise, boyutun çıkış kanallarına uyması kontrol edilir
-        if pos_weight is not None and out_channels is not None:
-            assert pos_weight.ndim == 1 and len(pos_weight) == out_channels, \
-                f"pos_weight boyutu {len(pos_weight)} out_channels boyutuna {out_channels} uymuyor"
+        # BCEWithLogitsLoss sadece 1 boyutlu pos_weight bekler.
+        # Bu yüzden tensörün şeklini burada ayarlıyoruz.
+        if pos_weight is not None:
+            # pos_weight'in BCEWithLogitsLoss'a geçirilmesi için uygun boyutta olduğundan emin ol
+            if pos_weight.ndim == 1:
+                # Tek boyutluysa, broadcast için uygun hale getir
+                # BCEWithLogitsLoss her sınıf için ayrı ağırlık bekler, bu nedenle
+                # (1, num_classes, 1, 1) şekline getirilmelidir.
+                pos_weight = pos_weight.view(1, len(pos_weight), 1, 1)
 
         self.register_buffer("pos_weight", pos_weight if pos_weight is not None else None)
         self.bce = nn.BCEWithLogitsLoss(pos_weight=self.pos_weight)
@@ -57,8 +61,7 @@ class BCEDiceLoss(nn.Module):
         bce_loss = self.bce(logits, targets)
         dice_loss = self.dice(logits, targets)
         return self.bce_weight * bce_loss + self.dice_weight * dice_loss
-
-
+    
 def get_loss_from_config(config: Dict[str, Any]) -> nn.Module:
     loss_cfg = config.get("loss", {})
     loss_type = loss_cfg.get("type", "BCEDiceLoss")
@@ -72,22 +75,24 @@ def get_loss_from_config(config: Dict[str, Any]) -> nn.Module:
     elif loss_type == "BCEDiceLoss":
         pos_weight_cfg: Union[list, float, None] = params.get("pos_weight", None)
         pos_weight = None
+        out_channels = config.get("model", {}).get("out_channels", 1)
 
         if isinstance(pos_weight_cfg, list):
+            if len(pos_weight_cfg) != out_channels:
+                 raise ValueError(f"pos_weight listesi boyutu ({len(pos_weight_cfg)}) model çıkış kanalı sayısına ({out_channels}) uymuyor.")
+            # pos_weight tensörünü tek boyutlu olarak oluştur
             pos_weight = torch.tensor(pos_weight_cfg, dtype=torch.float, device=device)
+            
         elif isinstance(pos_weight_cfg, (float, int)):
-            out_channels = config.get("model", {}).get("out_channels", 1)
-            # Tek bir float değerini out_channels boyutunda bir tensor'a genişlet
-            pos_weight = torch.full((out_channels,), float(pos_weight_cfg), dtype=torch.float, device=device)
-
-        out_channels = config.get("model", {}).get("out_channels", None)
+            pos_weight_val = float(pos_weight_cfg)
+            # Tek bir float değerini out_channels boyutunda bir tensöre genişlet
+            pos_weight = torch.full((out_channels,), pos_weight_val, dtype=torch.float, device=device)
 
         return BCEDiceLoss(
             pos_weight=pos_weight,
             bce_weight=float(params.get("bce_weight", 0.75)),
             dice_weight=float(params.get("dice_weight", 0.25)),
-            smooth=float(params.get("smooth", 1.0)),
-            out_channels=out_channels
+            smooth=float(params.get("smooth", 1.0))
         )
 
     else:

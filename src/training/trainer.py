@@ -6,7 +6,6 @@ from typing import Optional, Dict, Any, Callable, List
 from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
 from src.training import engine
 
-
 class Trainer:
     """
     Yüksek seviye eğitim yöneticisi.
@@ -17,21 +16,23 @@ class Trainer:
     - early stopping ve scheduler desteği
     """
 
-    def __init__(self,
-                 model: torch.nn.Module,
-                 optimizer: torch.optim.Optimizer,
-                 criterion: Callable,
-                 metrics: Optional[Dict[str, Callable]],
-                 train_loader: torch.utils.data.DataLoader,
-                 val_loader: torch.utils.data.DataLoader,
-                 device: str = "cuda",
-                 scheduler: Optional[_LRScheduler] = None,
-                 use_amp: bool = True,
-                 out_dir: str = "outputs",
-                 clip_grad_norm: Optional[float] = None,
-                 monitor: str = "dice_mean",
-                 class_names: Optional[List[str]] = None):  # ✅ Yeni argüman
-
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        criterion: Callable,
+        metrics: Optional[Dict[str, Callable]],
+        train_loader: torch.utils.data.DataLoader,
+        val_loader: torch.utils.data.DataLoader,
+        device: str = "cuda",
+        scheduler: Optional[_LRScheduler] = None,
+        use_amp: bool = True,
+        out_dir: str = "outputs",
+        clip_grad_norm: Optional[float] = None,
+        monitor: str = "dice_mean",
+        class_names: Optional[List[str]] = None,
+        visualize_out_dir: Optional[str] = None,
+    ):
         # core
         self.model = model.to(device)
         self.optimizer = optimizer
@@ -43,10 +44,12 @@ class Trainer:
         # config
         self.device = torch.device(device)
         self.scheduler = scheduler
+        # AMP, sadece CUDA cihazı varsa etkinleştirilir
         self.use_amp = use_amp and self.device.type == "cuda"
         self.clip_grad_norm = clip_grad_norm
         self.monitor = monitor
-        self.class_names = class_names  # ✅ Atama
+        self.class_names = class_names
+        self.visualize_out_dir = visualize_out_dir
 
         # state
         self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
@@ -56,11 +59,15 @@ class Trainer:
         # dirs
         self.out_dir = out_dir
         os.makedirs(os.path.join(self.out_dir, "checkpoints"), exist_ok=True)
+        if self.visualize_out_dir:
+            os.makedirs(self.visualize_out_dir, exist_ok=True)
+            print(f"[INFO] Görsel çıktı dizini oluşturuldu: {self.visualize_out_dir}")
 
     # ------------------------
     # Checkpoint
     # ------------------------
     def save_checkpoint(self, epoch: int, is_best: bool = False, name: str = "checkpoint.pth"):
+        """Eğitim durumunu kaydeder."""
         ckpt = {
             "epoch": epoch,
             "model_state_dict": self.model.state_dict(),
@@ -74,6 +81,7 @@ class Trainer:
             torch.save(ckpt, os.path.join(self.out_dir, "checkpoints", "best.pth"))
 
     def load_checkpoint(self, path: str, load_optimizer: bool = False):
+        """Kaydedilmiş bir eğitim durumunu yükler."""
         ckpt = torch.load(path, map_location=self.device)
         self.model.load_state_dict(ckpt["model_state_dict"])
         if load_optimizer and "optimizer_state_dict" in ckpt:
@@ -88,13 +96,15 @@ class Trainer:
     # ------------------------
     # Training Loop
     # ------------------------
-    def fit(self,
-            num_epochs: int,
-            start_epoch: int = 1,
-            save_every: int = 1,
-            early_stopping: Optional[int] = None):
-
+    def fit(
+        self,
+        num_epochs: int,
+        start_epoch: int = 1,
+        save_every: int = 1,
+        early_stopping: Optional[int] = None,
+    ):
         patience = 0
+        self.start_time = time.time()
 
         for epoch in range(start_epoch, num_epochs + 1):
             t0 = time.time()
@@ -111,7 +121,7 @@ class Trainer:
                 use_amp=self.use_amp,
                 clip_grad_norm=self.clip_grad_norm,
                 metrics_cfg=self.metrics,
-                class_names=self.class_names,  # ✅ Yeni: class_names argümanı eklendi
+                class_names=self.class_names,
             )
 
             # ---- validate ----
@@ -122,7 +132,8 @@ class Trainer:
                 metrics_cfg=self.metrics,
                 device=self.device,
                 use_amp=self.use_amp,
-                class_names=self.class_names,  # ✅ Yeni: class_names argümanı eklendi
+                class_names=self.class_names,
+                visualize_out_dir=self.visualize_out_dir,
             )
 
             val_loss = val_stats["loss"]
@@ -145,30 +156,38 @@ class Trainer:
                 self.history.setdefault(f"val_{k}", []).append(float(v))
 
             elapsed = time.time() - t0
-            print(f"Train Loss: {train_stats['loss']:.4f} | "
-                  f"Val Loss: {val_loss:.4f} | "
-                  f"{self.monitor}: {val_metrics.get(self.monitor, 0.0):.4f} | "
-                  f"time: {elapsed:.1f}s")
+            print(
+                f"Train Loss: {train_stats['loss']:.4f} | "
+                f"Val Loss: {val_loss:.4f} | "
+                f"{self.monitor}: {val_metrics.get(self.monitor, 0.0):.4f} | "
+                f"time: {elapsed:.1f}s"
+            )
 
             # ---- checkpoint ----
             if epoch % save_every == 0:
                 self.save_checkpoint(epoch, is_best=False, name=f"epoch_{epoch}.pth")
 
             # ---- best + early stopping ----
+            # En iyi metrik için val_loss'u negatif olarak kullanmak (çünkü loss minimize edilir)
             key_metric = val_metrics.get(self.monitor, -val_loss)
             if key_metric > self.best_metric:
                 self.best_metric = key_metric
                 self.save_checkpoint(epoch, is_best=True, name="best_epoch.pth")
-                print(f"[INFO] New best {self.monitor}: {self.best_metric:.4f}")
+                print(f"[INFO] Yeni en iyi {self.monitor}: {self.best_metric:.4f}")
                 patience = 0
             else:
                 patience += 1
                 if early_stopping is not None and patience >= early_stopping:
-                    print(f"[INFO] Early stopping at epoch {epoch}.")
+                    print(f"[INFO] Erken durdurma, epoch {epoch} sonunda.")
                     break
 
         # ---- final save ----
         self.save_checkpoint(num_epochs, is_best=False, name="last.pth")
-
-        with open(os.path.join(self.out_dir, "history.json"), "w") as f:
-            json.dump({k: [float(x) for x in v] for k, v in self.history.items()}, f, indent=2)
+        
+        # Eğitim geçmişini JSON dosyasına kaydet
+        history_path = os.path.join(self.out_dir, "training_history.json")
+        with open(history_path, "w") as f:
+            # Tüm değerleri float'a çevirerek kaydet
+            serializable_history = {k: [float(x) for x in v] for k, v in self.history.items()}
+            json.dump(serializable_history, f, indent=4)
+        print(f"[INFO] Eğitim geçmişi kaydedildi: {history_path}")

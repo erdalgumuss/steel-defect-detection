@@ -17,7 +17,7 @@ Pipeline yapısı, **plastik, cam, taş yünü, PET şişirme** gibi sektörlere
 
 ---
 
-![Pipeline](image.png)
+![**Pipeline**](image.png)
 
 ## 📂 Repo Yapısı
 
