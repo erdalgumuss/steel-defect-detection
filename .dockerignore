@@ -1,0 +1,37 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Build outputs
+build/
+dist/
+.eggs/
+*.manifest
+*.spec
+
+# Jupyter / notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# Logs & debug
+*.log
+logs/
+debug/
+.DS_Store
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp

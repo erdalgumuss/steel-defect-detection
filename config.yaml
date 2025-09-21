@@ -1,31 +1,73 @@
 experiment:
-  name: "unet_baseline"
-  seed: 42
+  name: "unet_baseline"   # Deneyin adı (loglama ve checkpointlerde kullanılır)
+  seed: 42                # Rastgelelik kontrolü için seed (tekrar üretilebilirlik)
+  deterministic: true     # CUDNN deterministic mode (True: daha yavaş ama tekrarlanabilir sonuçlar)
+
+paths:
+  raw: "data/raw"         # Ham verilerin bulunduğu klasör (train.csv, train_images)
+  processed: "data/processed"   # Ön-işlenmiş verilerin kaydedileceği klasör
+  outputs: "outputs"      # Çıktıların (checkpoint, log, görsel) kaydedileceği klasör
 
 data:
-  train_split: "data/processed/splits/train_mini.txt"
-  val_split: "data/processed/splits/val_mini.txt"
-  img_dir: "data/raw/train_images"
-  mask_dir: "data/processed/masks_png"
+  train_split: "data/processed/splits/train_mini.txt"  # Eğitim için image id listesi
+  val_split: "data/processed/splits/val_mini.txt"      # Doğrulama için image id listesi
+  img_dir: "data/raw/train_images"                     # Ham görüntülerin dizini
+  mask_dir: "data/processed/masks_png"                 # Ön-işlenmiş maskelerin dizini
+  img_size: [128, 128]  # Görseller eğitim öncesi yeniden boyutlandırılacak boyut (CPU için küçültüldü)
 
 training:
-  device: "cpu" # cpu da yazabilirsin
-  batch_size: 2
-  num_workers: 0
-  epochs: 10 # 🔥 artık "epochs"
-  lr: 0.0001
-  checkpoint_dir: "outputs/checkpoints"
+  device: "cpu"         # Eğitim cihazı: "cuda" (GPU) veya "cpu"
+  batch_size: 1         # Kaç örneğin aynı anda işleneceği (CPU için 1 küçük değer seçildi)
+  num_workers: 0        # DataLoader worker sayısı (0: tek işlem, CPU’da uyumlu)
+  epochs: 2             # Kaç epoch boyunca eğitim yapılacak (CPU için deneme amaçlı düşük tutuldu)
+  lr: 0.0001            # Öğrenme oranı (optimizer için)
+  clip_grad_norm: 1.0   # Gradient clipping (1.0 üstü normlar kırpılır, null ise kapalı)
+  use_amp: false        # Mixed precision (GPU’da hız için true, CPU’da false olmalı)
+  early_stopping: 5     # Belirtilen epoch boyunca iyileşme olmazsa eğitim durur
+  save_every: 1         # Kaç epoch’ta bir checkpoint kaydedileceği
+  start_epoch: 1        # Eğitim başlangıç epoch numarası (resume için değiştirilebilir)
+  monitor: "dice_mean"  # En iyi modeli seçmek için izlenecek metrik (örn. dice_mean, iou_mean)
+  checkpoint_dir: outputs/checkpoints
 
 model:
-  in_channels: 3
-  out_channels: 4
-  backbone: "unet_effnet" # ileride fpn/effnet gibi varyantlara geçilebilir
+  in_channels: 3        # Giriş kanal sayısı (RGB için 3)
+  out_channels: 4       # Çıkış kanal sayısı (4 sınıf segmentasyonu için)
+  features: [64, 128, 256, 512]  # Encoder katmanlarının kanal sayıları
+  norm: "batch"         # Normalizasyon tipi: "batch", "group" veya None
+  dropout: 0.0          # Dropout oranı (0: kapalı)
+  num_groups: 8         # GroupNorm için grup sayısı
+  init: "kaiming"       # Ağırlık başlatma: "kaiming" | "xavier" | None
+  up_mode: "transpose"  # Decoder upsampling: "transpose" (ConvTranspose2d) | "bilinear" (Upsample + Conv)
 
 loss:
-  type: "BCEDiceLoss"
-  bce_weight: 0.75
-  dice_weight: 0.25
+  type: "BCEDiceLoss"   # Kullanılacak loss fonksiyonu (kombinasyon: BCE + Dice)
+  params:
+    bce_weight: 0.7     # BCE kaybının ağırlığı
+    dice_weight: 0.3    # Dice kaybının ağırlığı
+    smooth: 1.0         # Dice loss için smoothing faktörü
+    #pos_weight: [1.0, 5.0, 10.0, 2.0]  # Sınıf dengesizlikleri için pozitif ağırlık (opsiyonel)
+
+metrics:
+  dice:
+    threshold: 0.5      # Tahmin maskesini ikili hale getirme eşiği
+    smooth: 1e-6        # Dice metriği için smoothing faktörü
+  iou:
+    threshold: 0.5      # IoU metriği için ikili eşik
+    smooth: 1e-6        # IoU metriği için smoothing faktörü
 
 logging:
-  save_dir: "outputs/checkpoints"
-  plots_dir: "outputs"
+  save_dir: "outputs/checkpoints"  # Logların kaydedileceği klasör
+  plots_dir: "outputs"             # Grafiklerin kaydedileceği klasör
+  loggers: ["tensorboard"]         # Loglama aracı: "tensorboard", "wandb"
+  wandb_project: "steel_defect_unet"  # WandB kullanılırsa proje adı
+
+preprocess:
+  save_masks: ["png"]   # Maskelerin hangi formatta kaydedileceği (png/npz)
+  make_splits: true     # Train/val ayrımı yapılacak mı
+  num_visualize: 20     # Kaç örnek için overlay görseli kaydedilecek
+  n_folds: 5            # Cross-validation için fold sayısı
+  mini_ratio: 0.1       # Datasetin %10’u mini set olsun
+  train_file: "data/processed/splits/train.txt"         # opsiyonel override
+  val_file: "data/processed/splits/val.txt"             # opsiyonel override
+  train_file_mini: "data/processed/splits/train_mini.txt"  # opsiyonel override
+  val_file_mini: "data/processed/splits/val_mini.txt"      # opsiyonel override

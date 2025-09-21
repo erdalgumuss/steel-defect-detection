@@ -1,62 +1,131 @@
-#src/training/engine.py
 import torch
 from tqdm import tqdm
+from typing import Optional, Dict, Callable
+from src.training.metrics import metrics_summary
 
-def train_one_epoch(model, loader, optimizer, criterion, device, scaler=None):
+
+def train_one_epoch(model: torch.nn.Module,
+                    loader: torch.utils.data.DataLoader,
+                    optimizer: torch.optim.Optimizer,
+                    criterion: Callable,
+                    device: torch.device,
+                    use_amp: bool = True,
+                    clip_grad_norm: Optional[float] = None,
+                    scaler: Optional[torch.cuda.amp.GradScaler] = None,
+                    metrics_cfg: Optional[Dict] = None,
+                    class_names: Optional[list] = None) -> Dict[str, float]:
+    """
+    Train for one epoch — only loss per batch, metrics once at end.
+    """
     model.train()
-    total_loss = 0
-    for imgs, masks in tqdm(loader, desc="Train", leave=False):
-        imgs, masks = imgs.to(device), masks.to(device).float()
-        optimizer.zero_grad()
+    total_loss = 0.0
+    n_batches = len(loader)
 
-        with torch.cuda.amp.autocast(enabled=scaler is not None):
+    if scaler is None:
+        scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+
+    all_logits, all_masks = [], []
+
+    pbar = tqdm(enumerate(loader), total=n_batches, desc="Train", leave=False)
+    for batch_idx, (imgs, masks) in pbar:
+        imgs = imgs.to(device)
+        masks = masks.to(device).float()
+
+        optimizer.zero_grad()
+        with torch.cuda.amp.autocast(enabled=use_amp):
             logits = model(imgs)
+
+            if batch_idx == 0:
+                print(f"[DEBUG][TRAIN] logits shape: {logits.shape}, dtype: {logits.dtype}, device: {logits.device}")
+                print(f"[DEBUG][TRAIN] masks  shape: {masks.shape}, dtype: {masks.dtype}, device: {masks.device}")
+
             loss = criterion(logits, masks)
 
-        if scaler:
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            loss.backward()
-            optimizer.step()
+        # backward
+        scaler.scale(loss).backward()
+        if clip_grad_norm is not None:
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), clip_grad_norm)
+        scaler.step(optimizer)
+        scaler.update()
 
         total_loss += loss.item()
-    return total_loss / len(loader)
+        avg_loss_so_far = total_loss / (batch_idx + 1)
+        pbar.set_postfix({"loss": f"{avg_loss_so_far:.4f}"})
 
-def validate_one_epoch(model, loader, criterion, metric_fn, device):
+        # save outputs for metrics
+        all_logits.append(logits.detach().cpu())
+        all_masks.append(masks.detach().cpu())
+
+    avg_loss = total_loss / n_batches if n_batches else 0.0
+
+    # ✅ tek seferde metrik hesapla
+    metrics_out = {}
+    if metrics_cfg:
+        all_logits = torch.cat(all_logits, dim=0)
+        all_masks = torch.cat(all_masks, dim=0)
+        metrics_out = metrics_summary(
+            all_logits, all_masks,
+            dice_cfg=metrics_cfg.get("dice", {}),
+            iou_cfg=metrics_cfg.get("iou", {}),
+            class_names=class_names
+        )
+
+    return {"loss": avg_loss, "metrics": metrics_out}
+
+
+def validate_one_epoch(model: torch.nn.Module,
+                       loader: torch.utils.data.DataLoader,
+                       criterion: Callable,
+                       metrics_cfg: Optional[Dict],
+                       device: torch.device,
+                       use_amp: bool = True,
+                       scaler: Optional[torch.cuda.amp.GradScaler] = None, # ✅ Eklenen argüman
+                       class_names: Optional[list] = None) -> Dict[str, float]:
+    """
+    Validate for one epoch — only loss per batch, metrics once at end.
+    """
     model.eval()
-    total_loss = 0
-    total_metric = 0
+    total_loss = 0.0
+    n_batches = len(loader)
+
+    all_logits, all_masks = [], []
+
     with torch.no_grad():
-        for imgs, masks in tqdm(loader, desc="Val", leave=False):
-            imgs, masks = imgs.to(device), masks.to(device).float()
-            logits = model(imgs)
-            loss = criterion(logits, masks)
-            metric = metric_fn(logits, masks)
+        pbar = tqdm(enumerate(loader), total=n_batches, desc="Val", leave=False)
+        for batch_idx, (imgs, masks) in pbar:
+            imgs = imgs.to(device)
+            masks = masks.to(device).float()
+
+            with torch.cuda.amp.autocast(enabled=use_amp):
+                logits = model(imgs)
+
+                if batch_idx == 0:
+                    print(f"[DEBUG][VAL] logits shape: {logits.shape}, dtype: {logits.dtype}, device: {logits.device}")
+                    print(f"[DEBUG][VAL] masks  shape: {masks.shape}, dtype: {masks.dtype}, device: {masks.device}")
+
+                loss = criterion(logits, masks)
 
             total_loss += loss.item()
-            total_metric += metric
-    return total_loss / len(loader), total_metric / len(loader)
+            avg_loss_so_far = total_loss / (batch_idx + 1)
+            pbar.set_postfix({"val_loss": f"{avg_loss_so_far:.4f}"})
 
-def fit(model, train_loader, val_loader, optimizer, criterion, metric_fn,
-        device, epochs=10, scheduler=None, use_amp=True, save_path="outputs/checkpoints/best_model.pth"):
-    
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
-    best_metric = -1.0
+            # save outputs for metrics
+            all_logits.append(logits.detach().cpu())
+            all_masks.append(masks.detach().cpu())
 
-    for epoch in range(1, epochs + 1):
-        print(f"\nEpoch {epoch}/{epochs}")
-        train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, scaler)
-        val_loss, val_metric = validate_one_epoch(model, val_loader, criterion, metric_fn, device)
+    avg_loss = total_loss / n_batches if n_batches else 0.0
 
-        if scheduler:
-            scheduler.step()
+    # ✅ tek seferde metrik hesapla
+    metrics_out = {}
+    if metrics_cfg:
+        all_logits = torch.cat(all_logits, dim=0)
+        all_masks = torch.cat(all_masks, dim=0)
+        metrics_out = metrics_summary(
+            all_logits, all_masks,
+            dice_cfg=metrics_cfg.get("dice", {}),
+            iou_cfg=metrics_cfg.get("iou", {}),
+            class_names=class_names
+        )
 
-        print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Dice: {val_metric:.4f}")
-
-        # Save best model
-        if val_metric > best_metric:
-            best_metric = val_metric
-            torch.save(model.state_dict(), save_path)
-            print(f"[INFO] Saved best model with Dice {best_metric:.4f}")
+    return {"loss": avg_loss, "metrics": metrics_out}

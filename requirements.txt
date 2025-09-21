@@ -4,6 +4,7 @@ pandas
 matplotlib
 tqdm
 scikit-learn
+pyyaml
 
 # Görüntü işleme
 opencv-python-headless
@@ -14,3 +15,6 @@ torch
 torchvision
 segmentation-models-pytorch
 
+# Logging (opsiyonel)
+tensorboard
+wandb
