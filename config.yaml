@@ -16,7 +16,7 @@ data:
   img_size: [256, 1600]  # Görseller eğitim öncesi yeniden boyutlandırılacak boyut (CPU için küçültüldü)
 
 training:
-  device: "cpu"         # Eğitim cihazı: "cuda" (GPU) veya "cpu"
+  device: "cuda"         # Eğitim cihazı: "cuda" (GPU) veya "cpu"
   batch_size: 1         # Kaç örneğin aynı anda işleneceği (CPU için 1 küçük değer seçildi)
   num_workers: 0        # DataLoader worker sayısı (0: tek işlem, CPU’da uyumlu)
   epochs: 2             # Kaç epoch boyunca eğitim yapılacak (CPU için deneme amaçlı düşük tutuldu)
