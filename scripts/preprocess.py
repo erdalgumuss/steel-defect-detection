@@ -17,7 +17,7 @@ from src.data.preprocess_utils import (
 )
 
 
-def load_config(path="config.yaml"):
+def load_config(path="config_resnet.yaml"):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Config bulunamadı: {path}")
     with open(path, "r") as f:
