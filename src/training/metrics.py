@@ -1,17 +1,11 @@
 import torch
 from typing import Dict, Any, List, Optional
 
-
 def _binarize(
     logits: torch.Tensor,
     threshold: float = 0.5,
     mode: str = "sigmoid"
 ) -> torch.Tensor:
-    """
-    Binarize predictions for segmentation.
-    mode="sigmoid" -> multi-label (independent classes)
-    mode="softmax" -> multi-class (exclusive class)
-    """
     if mode == "sigmoid":
         probs = torch.sigmoid(logits)
         return (probs > threshold).float()
@@ -24,12 +18,8 @@ def _binarize(
     else:
         raise ValueError(f"Unknown mode {mode}")
 
-
 def _flatten_batch_spatial(x: torch.Tensor) -> torch.Tensor:
-    """(B, C, H, W) -> (B, C, H*W)"""
-    B, C, H, W = x.shape
-    return x.view(B, C, -1)
-
+    return x.view(x.shape[0], x.shape[1], -1)
 
 def _compute_per_class(
     logits: torch.Tensor,
@@ -41,65 +31,51 @@ def _compute_per_class(
     weighted: bool = False,
     metric: str = "dice",
 ) -> Dict[str, float]:
-    """
-    Compute Dice or IoU per class in a unified function.
-    """
-    try:
-        if logits.numel() == 0:
-            return {}
+    if logits.numel() == 0:
+        return {}
 
-        preds = _binarize(logits, threshold, mode)
-        preds_f = _flatten_batch_spatial(preds)
-        targets_f = _flatten_batch_spatial(targets.float())
+    preds = _binarize(logits, threshold, mode)
+    preds_f = _flatten_batch_spatial(preds)
+    targets_f = _flatten_batch_spatial(targets.float())
 
-        inter = (preds_f * targets_f).sum(dim=2)
+    inter = (preds_f * targets_f).sum(dim=2)
 
-        if metric == "dice":
-            denom = preds_f.sum(dim=2) + targets_f.sum(dim=2)
-            scores = (2 * inter + smooth) / (denom + smooth)
-        elif metric == "iou":
-            union = preds_f.sum(dim=2) + targets_f.sum(dim=2) - inter
-            scores = (inter + smooth) / (union + smooth)
-        else:
-            raise ValueError(f"Unsupported metric: {metric}")
+    if metric == "dice":
+        denom = preds_f.sum(dim=2) + targets_f.sum(dim=2)
+        scores = (2 * inter + smooth) / (denom + smooth)
+    elif metric == "iou":
+        union = preds_f.sum(dim=2) + targets_f.sum(dim=2) - inter
+        scores = (inter + smooth) / (union + smooth)
+    else:
+        raise ValueError(f"Unsupported metric: {metric}")
 
-        # batch -> mean per class
-        if weighted:
-            weights = targets_f.sum(dim=2).sum(dim=0) + 1e-6
-            per_class = (scores.sum(dim=0) / weights).tolist()
-        else:
-            per_class = scores.mean(dim=0).tolist()
+    if weighted:
+        weights = targets_f.sum(dim=2).sum(dim=0) + 1e-6
+        per_class = (scores.sum(dim=0) / weights)
+    else:
+        per_class = scores.mean(dim=0)
 
-        C = logits.shape[1]
-        names = class_names or [f"class_{i+1}" for i in range(C)]
-        return {names[i]: float(per_class[i]) for i in range(C)}
+    C = logits.shape[1]
+    names = class_names or [f"class_{i+1}" for i in range(C)]
 
-    except Exception as e:
-        print(f"[ERROR] _compute_per_class ({metric}) failed: {e}")
-        C = logits.shape[1] if logits.numel() > 0 else 4
-        names = class_names or [f"class_{i+1}" for i in range(C)]
-        return {names[i]: 0.0 for i in range(C)}
-
+    # GPU'da kalacak, CPU'ya sadece float() döndürürken çekiyoruz
+    return {names[i]: float(per_class[i].detach().cpu()) for i in range(C)}
 
 # ---- Public API ----
 
 def dice_per_class(*args, **kwargs) -> Dict[str, float]:
     return _compute_per_class(*args, **kwargs, metric="dice")
 
-
 def dice_mean(*args, **kwargs) -> float:
     per = dice_per_class(*args, **kwargs)
-    return float(sum(per.values()) / len(per)) if per else 0.0
-
+    return sum(per.values()) / len(per) if per else 0.0
 
 def iou_per_class(*args, **kwargs) -> Dict[str, float]:
     return _compute_per_class(*args, **kwargs, metric="iou")
 
-
 def iou_mean(*args, **kwargs) -> float:
     per = iou_per_class(*args, **kwargs)
-    return float(sum(per.values()) / len(per)) if per else 0.0
-
+    return sum(per.values()) / len(per) if per else 0.0
 
 def metrics_summary(
     logits: torch.Tensor,
@@ -108,45 +84,30 @@ def metrics_summary(
     iou_cfg: Dict[str, Any],
     class_names: Optional[List[str]] = None
 ) -> Dict[str, float]:
-    """
-    Compute summary metrics (dice + iou) per class and mean.
-    """
     out: Dict[str, float] = {}
+    dice_c = dice_per_class(
+        logits, targets,
+        threshold=dice_cfg.get("threshold", 0.5),
+        smooth=dice_cfg.get("smooth", 1e-6),
+        class_names=class_names,
+        mode=dice_cfg.get("mode", "sigmoid"),
+        weighted=dice_cfg.get("weighted", False),
+    )
+    out.update({f"dice_{k}": v for k, v in dice_c.items()})
+    out["dice_mean"] = sum(dice_c.values()) / len(dice_c) if dice_c else 0.0
 
-    try:
-        dice_c = dice_per_class(
-            logits, targets,
-            threshold=dice_cfg.get("threshold", 0.5),
-            smooth=dice_cfg.get("smooth", 1e-6),
-            class_names=class_names,
-            mode=dice_cfg.get("mode", "sigmoid"),
-            weighted=dice_cfg.get("weighted", False),
-        )
-        out.update({f"dice_{k}": v for k, v in dice_c.items()})
-        out["dice_mean"] = float(sum(dice_c.values()) / len(dice_c)) if dice_c else 0.0
+    iou_c = iou_per_class(
+        logits, targets,
+        threshold=iou_cfg.get("threshold", 0.5),
+        smooth=iou_cfg.get("smooth", 1e-6),
+        class_names=class_names,
+        mode=iou_cfg.get("mode", "sigmoid"),
+        weighted=iou_cfg.get("weighted", False),
+    )
+    out.update({f"iou_{k}": v for k, v in iou_c.items()})
+    out["iou_mean"] = sum(iou_c.values()) / len(iou_c) if iou_c else 0.0
 
-        iou_c = iou_per_class(
-            logits, targets,
-            threshold=iou_cfg.get("threshold", 0.5),
-            smooth=iou_cfg.get("smooth", 1e-6),
-            class_names=class_names,
-            mode=iou_cfg.get("mode", "sigmoid"),
-            weighted=iou_cfg.get("weighted", False),
-        )
-        out.update({f"iou_{k}": v for k, v in iou_c.items()})
-        out["iou_mean"] = float(sum(iou_c.values()) / len(iou_c)) if iou_c else 0.0
-
-    except Exception as e:
-        print(f"[ERROR] metrics_summary failed: {e}")
-        C = logits.shape[1] if logits.numel() > 0 else 4
-        names = class_names or [f"class_{i+1}" for i in range(C)]
-        out = {f"dice_{n}": 0.0 for n in names}
-        out.update({f"iou_{n}": 0.0 for n in names})
-        out["dice_mean"] = 0.0
-        out["iou_mean"] = 0.0
-
-    return {str(k): float(v) for k, v in out.items()}
-
+    return out
 
 def build_metrics(cfg: Dict[str, Any], class_names: Optional[List[str]] = None):
     dice_cfg = cfg.get("metrics", {}).get("dice", {})

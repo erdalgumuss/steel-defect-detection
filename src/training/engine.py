@@ -10,48 +10,37 @@ import logging
 
 
 class MetricTracker:
+    """
+    Epoch boyunca metrikleri RAM şişirmeden toplar.
+    """
     def __init__(self, metrics_cfg: Optional[Dict], class_names: Optional[list] = None):
         self.metrics_cfg = metrics_cfg
         self.class_names = class_names
         self.reset()
 
     def reset(self):
-        self.total_dice = None
-        self.total_iou = None
-        self.count = 0
+        self.all_logits = []
+        self.all_masks = []
 
     def update(self, logits: torch.Tensor, masks: torch.Tensor):
-        if not self.metrics_cfg:
-            return
-        # GPU üzerinde hesapla
-        with torch.no_grad():
-            batch_metrics = metrics_summary(
-                logits, masks,
-                dice_cfg=self.metrics_cfg.get("dice", {}),
-                iou_cfg=self.metrics_cfg.get("iou", {}),
-                class_names=self.class_names
-            )
-        if self.total_dice is None:
-            self.total_dice = {k: v for k, v in batch_metrics.items() if "dice" in k}
-            self.total_iou = {k: v for k, v in batch_metrics.items() if "iou" in k}
-        else:
-            for k in self.total_dice:
-                self.total_dice[k] += batch_metrics[k]
-            for k in self.total_iou:
-                self.total_iou[k] += batch_metrics[k]
-        self.count += 1
+        # CPU’ya taşı, detach et
+        self.all_logits.append(logits.detach().cpu())
+        self.all_masks.append(masks.detach().cpu())
 
-    def compute(self):
-        if self.count == 0:
+    def compute(self) -> Dict[str, float]:
+        if not self.metrics_cfg or not self.all_logits:
             return {}
-        metrics_out = {}
-        for k in self.total_dice:
-            metrics_out[k] = self.total_dice[k] / self.count
-        for k in self.total_iou:
-            metrics_out[k] = self.total_iou[k] / self.count
-        metrics_out["dice_mean"] = np.mean([v for k, v in metrics_out.items() if "dice_class" in k])
-        metrics_out["iou_mean"] = np.mean([v for k, v in metrics_out.items() if "iou_class" in k])
-        return metrics_out
+
+        logits = torch.cat(self.all_logits, dim=0)
+        masks = torch.cat(self.all_masks, dim=0)
+
+        return metrics_summary(
+            logits, masks,
+            dice_cfg=self.metrics_cfg.get("dice", {}),
+            iou_cfg=self.metrics_cfg.get("iou", {}),
+            class_names=self.class_names
+        )
+
 
 def _run_one_epoch(model: torch.nn.Module,
                    loader: torch.utils.data.DataLoader,
