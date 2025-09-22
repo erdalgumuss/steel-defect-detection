@@ -13,14 +13,14 @@ data:
   val_split: "data/processed/splits/val.txt"
   img_dir: "data/raw/train_images"
   mask_dir: "data/processed/masks_png"
-  img_size: [256, 800] # GPU dostu, CPU daha az yorulur
+  img_size: [256, 512]
 
 training:
   device: "cuda"
-  batch_size: 16 # GPU VRAM daha iyi kullanılır
+  batch_size: 1 # GPU VRAM daha iyi kullanılır
   num_workers: 2 # CPU yükü azalır, GPU beslenir
   epochs: 5
-  lr: 0.001
+  lr: 0.0003
   clip_grad_norm: 1.0
   use_amp: true
   early_stopping: 5
