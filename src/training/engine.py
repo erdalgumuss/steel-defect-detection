@@ -11,7 +11,7 @@ import logging
 
 class MetricTracker:
     """
-    Epoch boyunca metrikleri RAM şişirmeden toplar.
+    Accumulates metrics tensors on the device to avoid CPU bottleneck.
     """
     def __init__(self, metrics_cfg: Optional[Dict], class_names: Optional[list] = None):
         self.metrics_cfg = metrics_cfg
@@ -23,9 +23,9 @@ class MetricTracker:
         self.all_masks = []
 
     def update(self, logits: torch.Tensor, masks: torch.Tensor):
-        # CPU’ya taşı, detach et
-        self.all_logits.append(logits.detach().cpu())
-        self.all_masks.append(masks.detach().cpu())
+        # Accumulate tensors on the device (GPU)
+        self.all_logits.append(logits.detach())
+        self.all_masks.append(masks.detach())
 
     def compute(self) -> Dict[str, float]:
         if not self.metrics_cfg or not self.all_logits:
@@ -57,9 +57,9 @@ def _run_one_epoch(model: torch.nn.Module,
                    scheduler_step_on: str,
                    train: bool) -> Dict[str, float]:
     """
-    Ortak epoch runner.
-    train=True → train loop
-    train=False → validation loop
+    Common epoch runner.
+    train=True -> train loop
+    train=False -> validation loop
     """
     model.train(mode=train)
     total_loss = 0.0
