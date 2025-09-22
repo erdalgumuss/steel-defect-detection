@@ -18,7 +18,7 @@ data:
 training:
   device: "cuda"
   batch_size: 32 # GPU VRAM daha iyi kullanılır
-  num_workers: 2 # CPU yükü azalır, GPU beslenir
+  num_workers: 0 # CPU yükü azalır, GPU beslenir
   epochs: 5
   lr: 0.001
   clip_grad_norm: 1.0
