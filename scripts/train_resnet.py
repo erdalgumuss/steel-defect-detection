@@ -7,8 +7,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from src.data.dataset import SteelDefectDataset
-from src.data.transforms import get_train_transforms, get_val_transforms
-from src.models.unet_resnet import UNet  # ✅ unet_resnet'ten import
+from src.data.transforms import build_transforms
+from src.models.unet_resnet import UNet
 from src.training.losses import get_loss_from_config
 from src.training.metrics import build_metrics
 from src.training.trainer import Trainer
@@ -17,7 +17,7 @@ from src.training.trainer import Trainer
 # ------------------------
 # Utils
 # ------------------------
-def load_config(path="config_resnet.yaml"): # ✅ Varsayılan config dosyasını değiştirin
+def load_config(path="config_resnet.yaml"):
     with open(path, "r") as f:
         config = yaml.safe_load(f)
     if config is None:
@@ -59,13 +59,13 @@ def main():
         split_file=config["data"]["train_split"],
         img_dir=config["data"]["img_dir"],
         mask_dir=config["data"]["mask_dir"],
-        augmentations=get_train_transforms(config["data"].get("img_size", (256, 1600))),
+        augmentations=build_transforms("train", tuple(config["data"]["img_size"])),
     )
     val_dataset = SteelDefectDataset(
         split_file=config["data"]["val_split"],
         img_dir=config["data"]["img_dir"],
         mask_dir=config["data"]["mask_dir"],
-        augmentations=get_val_transforms(config["data"].get("img_size", (256, 1600))),
+        augmentations=build_transforms("val", tuple(config["data"]["img_size"])),
     )
 
     train_loader = DataLoader(
@@ -84,7 +84,6 @@ def main():
     # ------------------------
     # Model
     # ------------------------
-    # ✅ Güncellenen UNet sınıfına yeni parametreler ekleyin
     model = UNet(
         in_channels=config["model"]["in_channels"],
         out_channels=config["model"]["out_channels"],
@@ -96,7 +95,6 @@ def main():
         encoder_name=config["model"].get("encoder_name", "resnet18"),
         encoder_weights=config["model"].get("encoder_weights", "imagenet"),
     )
-
 
     # ------------------------
     # Loss
@@ -114,13 +112,14 @@ def main():
     # ------------------------
     # Metrics
     # ------------------------
-    metrics = build_metrics(config, class_names=[f"class_{i+1}" for i in range(config["model"]["out_channels"])])
+    class_names = [f"class_{i+1}" for i in range(config["model"]["out_channels"])]
+    metrics = build_metrics(config, class_names=class_names)
 
     # ------------------------
     # Trainer
     # ------------------------
     visualize_out_dir = os.path.join(config["paths"]["outputs"], "visualizations")
-    
+
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -132,10 +131,12 @@ def main():
         use_amp=config["training"].get("use_amp", True),
         out_dir=config["paths"]["outputs"],
         clip_grad_norm=config["training"].get("clip_grad_norm", None),
-        monitor="dice_mean",
-        class_names=[f"class_{i+1}" for i in range(config["model"]["out_channels"])],
+        monitor=config["training"].get("monitor", "dice_mean"),
+        monitor_mode=config["training"].get("monitor_mode", "max"),
+        class_names=class_names,
         visualize_out_dir=visualize_out_dir,
     )
+
     # ------------------------
     # Training Loop
     # ------------------------

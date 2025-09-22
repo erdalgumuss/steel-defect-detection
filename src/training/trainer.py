@@ -2,9 +2,11 @@ import os
 import json
 import time
 import torch
+import logging
 from typing import Optional, Dict, Any, Callable, List
 from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
 from src.training import engine
+
 
 class Trainer:
     """
@@ -12,8 +14,8 @@ class Trainer:
 
     - train/val döngülerini çalıştırır
     - checkpoint kaydı / yükleme
-    - history.json kaydı
-    - early stopping ve scheduler desteği
+    - history.json incremental kaydı
+    - early stopping, scheduler desteği
     """
 
     def __init__(
@@ -26,10 +28,12 @@ class Trainer:
         val_loader: torch.utils.data.DataLoader,
         device: str = "cuda",
         scheduler: Optional[_LRScheduler] = None,
+        scheduler_step_on: str = "epoch",  # ✅ "epoch" | "batch"
         use_amp: bool = True,
         out_dir: str = "outputs",
         clip_grad_norm: Optional[float] = None,
         monitor: str = "dice_mean",
+        monitor_mode: str = "max",  # ✅ "max" | "min"
         class_names: Optional[List[str]] = None,
         visualize_out_dir: Optional[str] = None,
     ):
@@ -44,16 +48,17 @@ class Trainer:
         # config
         self.device = torch.device(device)
         self.scheduler = scheduler
-        # AMP, sadece CUDA cihazı varsa etkinleştirilir
+        self.scheduler_step_on = scheduler_step_on
         self.use_amp = use_amp and self.device.type == "cuda"
         self.clip_grad_norm = clip_grad_norm
         self.monitor = monitor
+        self.monitor_mode = monitor_mode
         self.class_names = class_names
         self.visualize_out_dir = visualize_out_dir
 
         # state
         self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
-        self.best_metric = -float("inf")
+        self.best_metric = -float("inf") if monitor_mode == "max" else float("inf")
         self.history: Dict[str, Any] = {"train_loss": [], "val_loss": []}
 
         # dirs
@@ -61,7 +66,13 @@ class Trainer:
         os.makedirs(os.path.join(self.out_dir, "checkpoints"), exist_ok=True)
         if self.visualize_out_dir:
             os.makedirs(self.visualize_out_dir, exist_ok=True)
-            print(f"[INFO] Görsel çıktı dizini oluşturuldu: {self.visualize_out_dir}")
+            logging.info(f"Görsel çıktı dizini oluşturuldu: {self.visualize_out_dir}")
+
+        # logging
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            level=logging.INFO
+        )
 
     # ------------------------
     # Checkpoint
@@ -108,7 +119,7 @@ class Trainer:
 
         for epoch in range(start_epoch, num_epochs + 1):
             t0 = time.time()
-            print(f"\nEpoch {epoch}/{num_epochs}")
+            logging.info(f"Epoch {epoch}/{num_epochs}")
 
             # ---- train ----
             train_stats = engine.train_one_epoch(
@@ -143,20 +154,19 @@ class Trainer:
             if self.scheduler is not None:
                 if isinstance(self.scheduler, ReduceLROnPlateau):
                     self.scheduler.step(val_metrics.get(self.monitor, val_loss))
-                else:
+                elif self.scheduler_step_on == "epoch":
                     self.scheduler.step()
 
             # ---- history ----
             self.history["train_loss"].append(float(train_stats["loss"]))
             self.history["val_loss"].append(float(val_loss))
-
             for k, v in train_stats.get("metrics", {}).items():
                 self.history.setdefault(f"train_{k}", []).append(float(v))
             for k, v in val_metrics.items():
                 self.history.setdefault(f"val_{k}", []).append(float(v))
 
             elapsed = time.time() - t0
-            print(
+            logging.info(
                 f"Train Loss: {train_stats['loss']:.4f} | "
                 f"Val Loss: {val_loss:.4f} | "
                 f"{self.monitor}: {val_metrics.get(self.monitor, 0.0):.4f} | "
@@ -168,26 +178,36 @@ class Trainer:
                 self.save_checkpoint(epoch, is_best=False, name=f"epoch_{epoch}.pth")
 
             # ---- best + early stopping ----
-            # En iyi metrik için val_loss'u negatif olarak kullanmak (çünkü loss minimize edilir)
-            key_metric = val_metrics.get(self.monitor, -val_loss)
-            if key_metric > self.best_metric:
+            key_metric = val_metrics.get(self.monitor, val_loss)
+            is_better = (
+                (self.monitor_mode == "max" and key_metric > self.best_metric)
+                or (self.monitor_mode == "min" and key_metric < self.best_metric)
+            )
+            if is_better:
                 self.best_metric = key_metric
                 self.save_checkpoint(epoch, is_best=True, name="best_epoch.pth")
-                print(f"[INFO] Yeni en iyi {self.monitor}: {self.best_metric:.4f}")
+                logging.info(f"Yeni en iyi {self.monitor}: {self.best_metric:.4f}")
                 patience = 0
             else:
                 patience += 1
                 if early_stopping is not None and patience >= early_stopping:
-                    print(f"[INFO] Erken durdurma, epoch {epoch} sonunda.")
+                    logging.info(f"Erken durdurma, epoch {epoch} sonunda.")
                     break
+
+            # ---- incremental history save ----
+            self._save_history()
 
         # ---- final save ----
         self.save_checkpoint(num_epochs, is_best=False, name="last.pth")
-        
-        # Eğitim geçmişini JSON dosyasına kaydet
+        self._save_history()
+        logging.info("Eğitim tamamlandı.")
+
+    # ------------------------
+    # Helpers
+    # ------------------------
+    def _save_history(self):
+        """Eğitim geçmişini JSON dosyasına kaydeder (incremental)."""
         history_path = os.path.join(self.out_dir, "training_history.json")
         with open(history_path, "w") as f:
-            # Tüm değerleri float'a çevirerek kaydet
             serializable_history = {k: [float(x) for x in v] for k, v in self.history.items()}
             json.dump(serializable_history, f, indent=4)
-        print(f"[INFO] Eğitim geçmişi kaydedildi: {history_path}")

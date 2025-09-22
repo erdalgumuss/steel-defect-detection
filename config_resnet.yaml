@@ -17,9 +17,9 @@ data:
 
 training:
   device: "cpu"
-  batch_size: 1
+  batch_size: 2
   num_workers: 0
-  epochs: 2
+  epochs: 1
   lr: 0.0001
   clip_grad_norm: 1.0
   use_amp: false
