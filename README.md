@@ -1,4 +1,4 @@
-# 🏭 Steel Defect Detection – Endüstriyel Kalite Kontrol için Yapay Zeka
+# 🏭 Steel Defect Detection – U-Net + ResNet18 Tabanlı Segmentasyon
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.x-red)
@@ -9,143 +9,112 @@
 
 ## 🎯 Proje Hakkında
 
-Bu proje, **Akbank Derin Öğrenme Bootcamp** kapsamında geliştirilmiştir.
-Amacı, çelik üretiminde yüzey kusurlarını **otomatik olarak tespit eden bir yapay zekâ pipeline’ı** oluşturmaktır.
+Bu proje, **çelik yüzey kusurlarının segmentasyonu** için geliştirilmiş bir **derin öğrenme pipeline** içerir. Amaç, endüstriyel kalite kontrol süreçlerinde kusurların otomatik tespitini sağlamaktır.
 
-Bu çalışma yalnızca bir yarışma projesi değil; aynı zamanda **gerçek dünya endüstriyel kalite kontrol uygulamalarına referans** olacak şekilde tasarlanmıştır.
-Pipeline yapısı, **plastik, cam, taş yünü, PET şişirme** gibi sektörlere kolayca uyarlanabilir.
+Model mimarisi olarak **U-Net** kullanılır ve **ResNet-18 encoder (ImageNet pretrained)** ile desteklenmiştir. Eğitim süreci, modern veri augmentasyonları, Dice + Focal kayıp fonksiyonları ve GPU hızlandırmalı bir PyTorch altyapısı ile gerçekleştirilir.
+
+Bu yapı yalnızca Severstal Steel Defect Detection veriseti için değil, **farklı endüstriyel segmentasyon görevleri** için de kolayca uyarlanabilir.
 
 ---
 
-![**Pipeline**](image.png)
+![Pipeline](image.png)
 
-## 📂 Repo Yapısı
+## 📂 Proje Yapısı
 
 ```
 .
 ├── Dockerfile
 ├── README.md
-├── config.yaml
-├── data
-│   ├── README.md
-│   ├── processed/
-│   └── raw/
-│       ├── sample_submission.csv
-│       └── train.csv
-├── image.png
-├── requirements.txt
-├── scripts
-│   ├── check_dataset.py
-│   ├── eval.py
-│   ├── predict.py
-│   ├── preprocess.py
-│   ├── smoke_test.py
-│   └── train.py
-└── src
-    ├── data
-    │   ├── dataset.py
-    │   ├── preprocess_utils.py
-    │   └── transforms.py
-    ├── models
-    │   └── unet.py
-    └── training
-        ├── engine.py
-        ├── losses.py
-        ├── metrics.py
-        └── trainer.py
+├── config.yaml              # Eğitim ve model ayarları
+├── configs/                 # Alternatif config senaryoları
+├── docker-compose.yml
+├── image.png                # Pipeline görseli
+├── notebooks/               # Jupyter notebooklar (keşif, test)
+│   └── 01-data-exploration.ipynb
+├── requirements.txt         # Gerekli kütüphaneler
+└── src/
+    ├── config.py            # Config loader (yaml -> dict)
+    ├── engines/             # Eğitim ve validasyon döngüleri
+    │   ├── training_engine.py
+    │   └── evaluation_engine.py
+    ├── losses/              # Kayıp fonksiyonları
+    │   ├── dice_loss.py
+    │   └── focal_loss.py
+    ├── main.py              # Ana çalıştırma dosyası (train loop)
+    ├── metrics/             # Metrikler
+    │   └── dice_coefficient.py
+    └── models/              # Model mimarileri
+        ├── backbones/       # ResNet, EfficientNet encoderlar
+        └── unet.py          # U-Net implementasyonu
 ```
-
-- **scripts/** → Eğitim, tahmin ve preprocessing scriptleri
-- **src/data/** → Dataset tanımı, dönüşümler, preprocessing yardımcıları
-- **src/models/** → U-Net tabanlı segmentasyon modelleri
-- **src/training/** → Eğitim döngüsü (engine, trainer), loss fonksiyonları, metrikler
-- **config.yaml** → Model, eğitim ve loss parametrelerinin merkezi yönetimi
 
 ---
 
-## 🏗️ Pipeline Mimarisine Genel Bakış
+## 🏗️ Pipeline Akışı
 
-### 🔹 1. Veri Yönetimi
+### 🔹 1. Veri
 
 - **Dataset**: Kaggle [Severstal: Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
-- **Preprocessing (`scripts/preprocess.py`)**
-
-  - RLE maskeler decode edilir.
-  - Görseller + maskeler `processed/` klasöründe organize edilir.
-  - Train/validation split oluşturulur.
+- **Format**: RLE maskeler → çok kanallı maskelere dönüştürülür (4 class).
+- **Dataset class**: `SteelDefectDataset` (`src/data/dataset.py`)
+- **Augmentasyon**: Albumentations kütüphanesi (crop, flip, affine, blur, brightness/contrast, normalize)
 
 ### 🔹 2. Model
 
-- **U-Net tabanlı segmentasyon modeli (`src/models/unet.py`)**
-- Esnek yapılandırma:
+- **U-Net** + **ResNet-18 encoder** (ImageNet pretrained)
+- Encoder-decoder yapısı modüler
+- Çok kanallı (4 sınıf) çıkış
 
-  - `features: [64,128,256,512]`
-  - `norm: batch | group | none`
-  - `dropout` desteği
+### 🔹 3. Loss Fonksiyonları
 
-- **Kaiming initialization** kullanılır.
+- **Dice Loss** → Overlap ölçümü
+- **Focal Loss** → Class imbalance için odaklanma
+- Kombinasyon: Dice + Focal desteklenebilir
 
-### 🔹 3. Eğitim Döngüsü
+### 🔹 4. Metrikler
 
-- **Trainer (`trainer.py`)**
+- **Dice Coefficient** (class-level + mean)
+- Notebooklarda görsel test ve loss/metric değerlendirmesi
 
-  - Eğitim & validasyon döngüleri
-  - Checkpoint kaydı (en iyi + son epoch)
-  - Early stopping desteği
-  - `history.json` kayıt
+### 🔹 5. Eğitim Döngüsü
 
-- **Engine (`engine.py`)**
+- `train_one_epoch` ve `validate_one_epoch` (src/engines/)
+- Adam optimizer, weight decay, learning rate config üzerinden yönetilir
+- Checkpoint kaydı ve final model kaydı
 
-  - AMP desteği (`torch.cuda.amp`)
-  - Grad clipping
-  - Batch başına loss ve metrik logging
+---
 
-### 🔹 4. Loss Fonksiyonları
+## ⚙️ Config Yönetimi
 
-- `DiceLoss`
-- `BCEDiceLoss` (kombinasyon: BCE + Dice)
-- Config tabanlı **factory** (`get_loss_from_config`)
-- `pos_weight` desteği (class imbalance için)
-
-### 🔹 5. Metrikler
-
-- **Dice ve IoU** hem class-level hem de mean hesaplanır.
-- `metrics.py` üzerinden config tabanlı seçilir.
-- `metrics_summary`: tüm sınıflar + ortalama değerleri kaydeder.
-
-### 🔹 6. Config.yaml Yönetimi
-
-Örnek config:
+Tüm parametreler **config.yaml** üzerinden yönetilir. Örnek:
 
 ```yaml
+experiment_name: "steel_defect_unet_resnet18"
+
+data:
+  train_csv: "data/train.csv"
+  train_images_dir: "data/train_images"
+  val_split: 0.2
+  image_height: 256
+  image_width: 1600
+  num_classes: 4
+
 training:
+  batch_size: 4
+  num_workers: 2
+  epochs: 20
+  learning_rate: 1e-4
+  weight_decay: 1e-5
   device: "cuda"
-  num_epochs: 50
-  batch_size: 8
-  learning_rate: 1e-3
 
 model:
-  in_channels: 3
-  out_channels: 4
-  features: [64, 128, 256, 512]
-  norm: "batch"
-  dropout: 0.1
+  backbone: "resnet18"
+  pretrained: true
 
-loss:
-  type: "BCEDiceLoss"
-  params:
-    bce_weight: 0.7
-    dice_weight: 0.3
-    smooth: 1.0
-    # pos_weight: [1.0, 5.0, 10.0, 2.0]
-
-metrics:
-  dice:
-    threshold: 0.5
-    smooth: 1e-6
-  iou:
-    threshold: 0.5
-    smooth: 1e-6
+logging:
+  output_dir: "outputs/"
+  checkpoint_dir: "checkpoints/"
+  save_every: 5
 ```
 
 ---
@@ -158,52 +127,45 @@ metrics:
 pip install -r requirements.txt
 ```
 
-Docker ile:
+veya Docker ile:
 
 ```bash
 docker build -t steel-defect-detection .
 docker run -it steel-defect-detection
 ```
 
-### 2️⃣ Veri Hazırlığı
+### 2️⃣ Eğitim
 
 ```bash
-python scripts/preprocess.py
+python src/main.py
 ```
 
-### 3️⃣ Eğitim
+### 3️⃣ Çıktılar
+
+- `checkpoints/` → her N epoch’ta model checkpointleri
+- `outputs/model_final.pth` → final model
+
+### 4️⃣ Notebook Keşfi
 
 ```bash
-python scripts/train.py
-```
-
-### 4️⃣ Tahmin
-
-```bash
-python scripts/predict.py --image path/to/image.jpg
-```
-
-### 5️⃣ Değerlendirme
-
-```bash
-python scripts/eval.py
+jupyter notebook notebooks/01-data-exploration.ipynb
 ```
 
 ---
 
 ## 📊 Özellikler
 
-- ✅ U-Net tabanlı esnek segmentasyon modeli
-- ✅ BCE + Dice Loss kombinasyonu
-- ✅ Dice ve IoU metrikleri (class-level + mean)
-- ✅ AMP (Mixed Precision Training)
-- ✅ Checkpoint, Early Stopping, Grad Clipping
-- ✅ Config tabanlı parametre yönetimi
-- ✅ Docker ile taşınabilir ortam
+- ✅ U-Net + ResNet18 encoder
+- ✅ Çok kanallı maskeler (4 class)
+- ✅ Dice + Focal Loss kombinasyonu
+- ✅ Dice metriği (ortalama + class-level)
+- ✅ Albumentations ile güçlü augmentasyon
+- ✅ Config tabanlı esnek yönetim
+- ✅ Docker ile taşınabilirlik
 
 ---
 
 ## 📌 Kaynaklar
 
 - Kaggle Competition: [Severstal: Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
-- Endüstriyel kalite kontrol literatürü
+- Endüstriyel yüzey kalite kontrol literatürü

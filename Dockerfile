@@ -17,7 +17,5 @@ RUN pip install --upgrade pip \
 
 # Kodları kopyala
 COPY . .
-
-
-# Varsayılan komut (örnek: preprocessing scripti çalıştırır)
-CMD ["python", "scripts/preprocess.py", "--help"]
+# Konteynerin dışarıya açacağı portu belirliyoruz (Jupyter için).
+EXPOSE 8888

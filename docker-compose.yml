@@ -1,0 +1,44 @@
+version: '3.9'   # 3.8 yerine 3.9 kullan
+
+services:
+  app:
+    build: .
+    container_name: steel-defect-detection-app
+    volumes:
+      - .:/app
+    ports:
+      - "8888:8888"
+    shm_size: '8gb'       # paylaşılan bellek artırma
+    tmpfs:                # /dev/shm mount
+      - /dev/shm:rw,nosuid,nodev,size=8g
+    command: tail -F /dev/null
+    # GPU desteği (opsiyonel, varsa aç)
+    # runtime: nvidia
+
+
+###### ######(Bad Practice :( )   
+#Docker Terminaline Bağlanma
+# Docker konteynerleri izole birer ortam. İçine girip komut çalıştırmak için şu komutu kullan:
+
+# Bash
+
+# docker-compose exec app bash
+# docker-compose exec: Çalışan bir konteyner içinde yeni bir komut çalıştırmanı sağlar.
+
+# app: docker-compose.yml dosyasında tanımladığımız servisimizin adı.
+
+# bash: Konteyner içinde çalıştıracağımız komut. Bu komut, sana bir Bash terminali açacak.
+
+# Bu komutu çalıştırdığında, terminalin root@<konteyner_id>:/app# gibi bir format alacak. Bu, artık konteynerin içindeki /app dizininde olduğunu gösterir. ls komutunu kullanarak proje dosyalarını görebilir ve her şeyin doğru bir şekilde bağlandığından emin olabilirsin.
+
+# Jupyter Notebook Ortamını Başlatma
+# Jupyter Notebook kullanma deneyimin olmadığı için, en başından itibaren her şeyi senin için hazırlayalım.
+
+# Konteynerin İçinden Jupyter'ı Başlatma: Konteynerin içindeyken (yukarıdaki komut ile bağlandıktan sonra), şu komutu çalıştır:
+
+# Bash
+
+# jupyter notebook --allow-root --ip=0.0.0.0 --port=8888 --no-browser
+# Bu komut Jupyter sunucusunu başlatacak. Terminalin sonunda sana bir URL verecektir (örneğin: http://127.0.0.1:8888/?token=...).
+
+# Jupyter'a Tarayıcıdan Erişme: Terminaldeki URL'yi kopyalayıp yerel makinenin web tarayıcısına yapıştır. Bu, seni Jupyter'ın ana sayfasına yönlendirecek ve projenin klasör yapısını tarayıcıdan görebileceksin.

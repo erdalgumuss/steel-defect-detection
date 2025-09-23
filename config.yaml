@@ -1,0 +1,26 @@
+experiment_name: "steel_defect_unet_resnet18"
+
+data:
+  train_csv: "data/raw/train.csv"
+  train_images_dir: "data/raw/train_images"
+  val_split: 0.2
+  image_height: 256
+  image_width: 1600
+  num_classes: 4
+
+training:
+  batch_size: 2
+  num_workers: 0
+  epochs: 2
+  learning_rate: 1e-4
+  weight_decay: 1e-5
+  device: "cpu"
+
+model:
+  backbone: "resnet18"
+  pretrained: true
+
+logging:
+  output_dir: "outputs/"
+  checkpoint_dir: "checkpoints/"
+  save_every: 5

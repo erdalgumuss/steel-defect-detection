@@ -1,98 +1,122 @@
 # src/data/dataset.py
+from __future__ import annotations
 import os
+from typing import Tuple, List
+import numpy as np
+import pandas as pd
 import cv2
 import torch
-import numpy as np
 from torch.utils.data import Dataset
-from typing import Optional, Any, List, Tuple
-import logging
+from .rle_decoder import build_multilabel_mask
 
-logger = logging.getLogger(__name__)
+from glob import glob
 
-
-class SegmentationDataset(Dataset):
+class SteelDefectDataset(Dataset):
     """
-    Generic dataset for image segmentation.
-    - Reads RGB images and multi-class binary masks
-    - Applies Albumentations transforms if provided
-    - Returns tensors in shape (C,H,W), float32
+    PyTorch Dataset for steel defect segmentation with multilabel (4 channels) masks.
+
+    Expects a DataFrame with columns: ['ImageId', 'ClassId', 'EncodedPixels'] where each ImageId
+    may have up to 4 rows (ClassId in {1..4}).
     """
 
-    def __init__(
-        self,
-        split_file: str,
-        img_dir: str,
-        mask_dir: str,
-        augmentations: Optional[Any] = None,
-        num_classes: int = 4,
-        img_ext: str = ".jpg",
-        mask_ext: str = ".png",
-    ):
-        with open(split_file, "r") as f:
-            self.image_ids: List[str] = [line.strip() for line in f.readlines()]
-
-        self.img_dir = img_dir
-        self.mask_dir = mask_dir
-        self.augmentations = augmentations
+    def __init__(self,
+                 df: pd.DataFrame,
+                 image_dir: str,
+                 shape: Tuple[int, int] = (256, 1600),
+                 num_classes: int = 4,
+                 transforms=None,
+                 cache_dir: str | None = None,
+                 assume_fortran_order: bool = True,
+                 load_rgb: bool = True):
+        super().__init__()
+        self.df = df.copy()
+        self.image_dir = image_dir
+        self.shape = shape
         self.num_classes = num_classes
-        self.img_ext = img_ext
-        self.mask_ext = mask_ext
+        self.transforms = transforms
+        self.cache_dir = cache_dir
+        self.order = 'F' if assume_fortran_order else 'C'
+        self.load_rgb = load_rgb
+
+        if self.cache_dir:
+            os.makedirs(self.cache_dir, exist_ok=True)
+
+        # Ensure ClassId exists; if not, create NaNs (for empty merges)
+        if 'ClassId' not in self.df.columns:
+            self.df['ClassId'] = np.nan
+
+        # Group rows per ImageId for fast indexing
+        self.groups: List[tuple[str, pd.DataFrame]] = list(self.df.groupby('ImageId'))
 
     def __len__(self) -> int:
-        return len(self.image_ids)
+        return len(self.groups)
 
-    def _load_image(self, image_id: str) -> np.ndarray:
-        """Load RGB image."""
-        img_path = os.path.join(self.img_dir, image_id)
-        image = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        if image is None:
-            raise FileNotFoundError(f"Image not found: {img_path}")
-        return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    def _read_image(self, image_id: str) -> np.ndarray:
+        path = os.path.join(self.image_dir, image_id)
+        img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            raise FileNotFoundError(f"Image not found: {path}")
+        if self.load_rgb:
+            img = np.repeat(img[..., None], 3, axis=2)  # (H, W, 3)
+        return img
 
-    def _load_masks(self, image_id: str, H: int, W: int) -> np.ndarray:
-        """Load per-class binary masks and stack as (C,H,W)."""
-        masks: List[np.ndarray] = []
-        base_name = image_id.replace(self.img_ext, "")
+    def _mask_cache_path(self, image_id: str) -> str:
+        if not self.cache_dir:
+            return ""
+        base = os.path.splitext(image_id)[0]
+        h, w = self.shape
+        return os.path.join(self.cache_dir, f"{base}_{h}x{w}_{self.num_classes}c_{self.order}.npz")
 
-        for c in range(1, self.num_classes + 1):
-            mask_path = os.path.join(
-                self.mask_dir, f"class{c}", f"{base_name}_c{c}{self.mask_ext}"
-            )
-            mask_c = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-            if mask_c is None:
-                mask_c = np.zeros((H, W), dtype=np.uint8)
-            masks.append(mask_c)
+    def _read_mask(self, image_id: str, rows_for_image: pd.DataFrame) -> np.ndarray:
+        if self.cache_dir:
+            cpath = self._mask_cache_path(image_id)
+            if os.path.exists(cpath):
+                return np.load(cpath)['mask']  # (C, H, W)
 
-        mask = np.stack(masks, axis=0).astype("float32") / 255.0
+        mask = build_multilabel_mask(rows_for_image, shape=self.shape, num_classes=self.num_classes, order=self.order)
+
+        if self.cache_dir:
+            np.savez_compressed(cpath, mask=mask)
         return mask
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        image_id = self.image_ids[idx]
+    def __getitem__(self, idx: int):
+        image_id, rows = self.groups[idx]
+        img = self._read_image(image_id)
+        mask = self._read_mask(image_id, rows)  # (C, H, W)
 
-        image = self._load_image(image_id)
-        H, W, _ = image.shape
-        mask = self._load_masks(image_id, H, W)
+        # Albumentations expects mask as HWC
+        mask_hwc = np.transpose(mask, (1, 2, 0))  # (H, W, C)
 
-        if self.augmentations:
-            augmented = self.augmentations(
-                image=image, masks=[mask[c] for c in range(self.num_classes)]
-            )
-            image = augmented["image"]
-            mask = torch.stack(
-                [torch.as_tensor(m, dtype=torch.float32) for m in augmented["masks"]]
-            )
+        if self.transforms is not None:
+            out = self.transforms(image=img, mask=mask_hwc)
+            img, mask_hwc = out['image'], out['mask']
         else:
-            image = torch.from_numpy(image).permute(2, 0, 1).float()
-            mask = torch.from_numpy(mask).float()
+            # Convert to tensors if no transforms provided
+            import torch
+            img = torch.from_numpy(img.transpose(2, 0, 1)).float()  # (C,H,W)
+            mask_hwc = torch.from_numpy(mask_hwc).float()  # (H,W,C)
 
-        if idx == 0:  # sadece ilk batch için debug
-            logger.debug(f"Image shape: {tuple(image.shape)}, Mask shape: {tuple(mask.shape)}")
-            assert mask.shape[0] == self.num_classes, \
-                f"Expected {self.num_classes} mask channels, got {mask.shape[0]}"
+        # Back to (C, H, W) for mask
+        if isinstance(mask_hwc, np.ndarray):
+            mask = torch.from_numpy(np.transpose(mask_hwc, (2, 0, 1))).float()
+        else:
+            mask = mask_hwc.permute(2, 0, 1).float()
 
-        return image, mask
+        meta = {"image_id": image_id}
+        return img, mask, meta
 
 
-class SteelDefectDataset(SegmentationDataset):
-    """Dataset wrapper for Steel Defect Detection."""
-    pass
+# --------- Convenience function for building a merged df (optional) ---------
+
+def build_full_dataframe(train_df: pd.DataFrame, image_dir: str) -> pd.DataFrame:
+    """
+    Given raw train_df and image directory, returns a merged df containing all images
+    present on disk with their (possibly NaN) EncodedPixels & ClassId rows.
+
+    This mirrors the merge you've done in your notebook.
+    """
+    image_paths = glob(os.path.join(image_dir, "*.jpg"))
+    image_ids = [os.path.basename(p) for p in image_paths]
+    all_images_df = pd.DataFrame(image_ids, columns=["ImageId"])
+    full_df = all_images_df.merge(train_df, on="ImageId", how="left")
+    return full_df
