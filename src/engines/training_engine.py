@@ -25,7 +25,7 @@ def train_one_epoch(model, loader: DataLoader, optimizer, device: str) -> Dict[s
         # Kayıplar
         loss_dice = dice_loss_fn(outputs, masks)
         loss_focal = focal_loss_fn(outputs, masks)
-        loss = loss_dice + loss_focal
+        loss = loss_dice + loss_focal   
 
         loss.backward()
         optimizer.step()

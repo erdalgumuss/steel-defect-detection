@@ -1,9 +1,11 @@
 import os
+import json
 import torch
 import pandas as pd
+from pathlib import Path
 from torch.utils.data import DataLoader
 
-from config import Config   # <-- bizim class
+from config import Config
 from data.dataset import SteelDefectDataset, build_full_dataframe
 from data.transforms import get_train_transforms, get_valid_transforms
 from models.unet import UNetResNet18
@@ -41,24 +43,19 @@ def main(config_path: str = "config.yaml"):
         train_ds,
         batch_size=cfg["training"]["batch_size"],
         shuffle=True,
-        num_workers=cfg["training"]["num_workers"],
-        pin_memory=True,           # GPU transferi için hızlandırma
-        prefetch_factor=2,         # CPU önceden batch hazırlar
-        persistent_workers=True,    # worker süreçleri tekrar tekrar kapanıp açılmaz
-        collate_fn=lambda b: (
-            torch.stack([x[0] for x in b]),
-            torch.stack([x[1] for x in b]),
-            [x[2] for x in b]
-        )
+        num_workers=2,
+        pin_memory=True,
+        prefetch_factor=2,
+        persistent_workers=True
     )
     valid_loader = DataLoader(
         valid_ds,
         batch_size=cfg["training"]["batch_size"],
         shuffle=False,
         num_workers=cfg["training"]["num_workers"],
-        pin_memory=True,           # GPU transferi için hızlandırma
-        prefetch_factor=2,         # CPU önceden batch hazırlar
-        persistent_workers=True,    # worker süreçleri tekrar tekrar kapanıp açılmaz
+        pin_memory=True,
+        prefetch_factor=2,
+        persistent_workers=True,
         collate_fn=lambda b: (
             torch.stack([x[0] for x in b]),
             torch.stack([x[1] for x in b]),
@@ -80,6 +77,8 @@ def main(config_path: str = "config.yaml"):
     )
 
     # ---- Training Loop ----
+    history = {"train": [], "valid": []}  # 🔥 ekleme
+
     for epoch in range(cfg["training"]["epochs"]):
         print(f"\nEpoch {epoch+1}/{cfg['training']['epochs']}")
 
@@ -88,6 +87,10 @@ def main(config_path: str = "config.yaml"):
 
         print(f"Train Loss: {train_metrics['loss']:.4f} | Train Dice: {train_metrics['dice']:.4f}")
         print(f"Valid Loss: {valid_metrics['loss']:.4f} | Valid Dice: {valid_metrics['dice']:.4f}")
+
+        # 🔥 history kaydı
+        history["train"].append(train_metrics)
+        history["valid"].append(valid_metrics)
 
         # Checkpoint kaydetme
         if (epoch + 1) % cfg["logging"]["save_every"] == 0:
@@ -101,6 +104,12 @@ def main(config_path: str = "config.yaml"):
     final_path = os.path.join(cfg["logging"]["output_dir"], "model_final.pth")
     torch.save(model.state_dict(), final_path)
     print(f"Final model saved: {final_path}")
+
+    # ---- Save History ----
+    history_path = Path(cfg["logging"]["output_dir"]) / "history.json"
+    with open(history_path, "w") as f:
+        json.dump(history, f, indent=4)
+    print(f"History saved: {history_path}")
 
 
 if __name__ == "__main__":
