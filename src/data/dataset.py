@@ -87,16 +87,22 @@ class SteelDefectDataset(Dataset):
         # Albumentations expects mask as HWC
         mask_hwc = np.transpose(mask, (1, 2, 0))  # (H, W, C)
 
+        # 🔥 Fix: img ve mask boyutlarını eşitle
+        if img.shape[:2] != mask_hwc.shape[:2]:
+            mask_hwc = cv2.resize(
+                mask_hwc,
+                (img.shape[1], img.shape[0]),   # (W, H)
+                interpolation=cv2.INTER_NEAREST
+            )
+
         if self.transforms is not None:
             out = self.transforms(image=img, mask=mask_hwc)
             img, mask_hwc = out['image'], out['mask']
         else:
-            # Convert to tensors if no transforms provided
             import torch
-            img = torch.from_numpy(img.transpose(2, 0, 1)).float()  # (C,H,W)
-            mask_hwc = torch.from_numpy(mask_hwc).float()  # (H,W,C)
+            img = torch.from_numpy(img.transpose(2, 0, 1)).float()
+            mask_hwc = torch.from_numpy(mask_hwc).float()
 
-        # Back to (C, H, W) for mask
         if isinstance(mask_hwc, np.ndarray):
             mask = torch.from_numpy(np.transpose(mask_hwc, (2, 0, 1))).float()
         else:
