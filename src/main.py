@@ -42,6 +42,9 @@ def main(config_path: str = "config.yaml"):
         batch_size=cfg["training"]["batch_size"],
         shuffle=True,
         num_workers=cfg["training"]["num_workers"],
+        pin_memory=True,           # GPU transferi için hızlandırma
+        prefetch_factor=2,         # CPU önceden batch hazırlar
+        persistent_workers=True,    # worker süreçleri tekrar tekrar kapanıp açılmaz
         collate_fn=lambda b: (
             torch.stack([x[0] for x in b]),
             torch.stack([x[1] for x in b]),
@@ -53,6 +56,9 @@ def main(config_path: str = "config.yaml"):
         batch_size=cfg["training"]["batch_size"],
         shuffle=False,
         num_workers=cfg["training"]["num_workers"],
+        pin_memory=True,           # GPU transferi için hızlandırma
+        prefetch_factor=2,         # CPU önceden batch hazırlar
+        persistent_workers=True,    # worker süreçleri tekrar tekrar kapanıp açılmaz
         collate_fn=lambda b: (
             torch.stack([x[0] for x in b]),
             torch.stack([x[1] for x in b]),
