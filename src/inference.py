@@ -51,7 +51,7 @@ def infer_single_image(model, image_path, device, cfg):
 # -------------------------
 def main(config_path="config.yaml",
          checkpoint="outputs/model_final.pth",
-         infer_dir="data/test_images",
+         infer_dir="data/raw/test_images",
          save_png=True,
          save_csv=True):
     cfg = Config(config_path).dict

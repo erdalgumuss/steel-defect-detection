@@ -13,6 +13,7 @@ from data.dataset import SteelDefectDataset, build_full_dataframe
 from data.transforms import get_train_transforms, get_valid_transforms
 from models.unet import UNetResNet18
 from engines.training_engine import train_one_epoch, validate_one_epoch
+from plot_utils import plot_history
 
 
 class EarlyStopping:
@@ -195,6 +196,9 @@ def main(config_path: str = "config.yaml"):
     with open(history_path, "w") as f:
         json.dump(history, f, indent=4)
     print(f"History saved: {history_path}")
+    # ---- Save Plots ----
+    plot_history(history, out_dir=cfg["logging"]["output_dir"])
+    print(f"Plots saved to {cfg['logging']['output_dir']}")
 
 
 if __name__ == "__main__":
