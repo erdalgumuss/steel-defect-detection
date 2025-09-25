@@ -3,8 +3,6 @@ from torch.utils.data import DataLoader
 from typing import Dict
 from tqdm import tqdm
 
-from losses.dice_loss import DiceLoss
-from losses.focal_loss import FocalLoss
 from metrics.dice_coefficient import dice_coefficient, dice_per_class
 from losses.weighted_focal_dice_loss import WeightedFocalDiceLoss
 
