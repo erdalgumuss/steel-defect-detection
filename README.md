@@ -15,9 +15,30 @@ Model mimarisi olarak **U-Net** kullanılır ve **ResNet-18 encoder (ImageNet pr
 
 Bu yapı yalnızca Severstal Steel Defect Detection veriseti için değil, **farklı endüstriyel segmentasyon görevleri** için de kolayca uyarlanabilir.
 
+Dengesiz sınıflar: Focal Loss (küçük sınıflara daha çok önem verir).
+
+Segmentasyon (piksel bazlı maske): Dice Loss (alanların ne kadar çakıştığını ölçer).
+Bu yüzden iki adet loss fonksiyonu kullanılmıştır.
+
 ---
 
-![Pipeline](image.png)
+## ![Pipeline](image.png)
+
+Neden ResNet Encoder?
+
+Feature extraction: ResNet-18, endüstride kanıtlanmış bir mimari. Özellikle skip-connection yapısı sayesinde derin ağlarda vanishing gradient sorununu çözer.
+
+Transfer learning: ImageNet üzerinde eğitilmiş ağırlıkları kullandığımızda, düşük seviye kenar/texture özellikleri daha hızlı öğrenilir. Bu da çelik yüzey kusurlarında avantaj sağlar.
+
+Performans/Verim Deengesi: ResNet-18 hem hafif, hem de güçlüdür → hızlı eğitim, düşük bellek kullanımı, endüstriyel uygulamalara uygunluk.
+
+🔀 Decoder Mode (add vs concat)
+
+add modu: Encoder ve decoder feature map’leri aynnı kanal boyutunda toplanır (up + skip). Daha hafif, daha az parametre → hızlı inference.
+
+concat modu: Encoder ve decoder feature map’leri kanal boyutu boyunca birleştirilir (torch.cat). Daha fazla bilgi taşır ama parametre sayısı ve bellek maliyeti artar.
+
+## Config dosyası üzerinden decoder_mode: "add" | "concat" seçilebilir.
 
 ## 📂 Proje Yapısı
 
@@ -110,6 +131,7 @@ training:
 model:
   backbone: "resnet18"
   pretrained: true
+  decoder_mode: "add"   # veya "concat"
 
 logging:
   output_dir: "outputs/"

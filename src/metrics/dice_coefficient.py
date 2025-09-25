@@ -35,3 +35,20 @@ def dice_coefficient(
 
     dice = (2.0 * intersection + epsilon) / (union + epsilon)
     return dice.mean()  # mean over batch and classes
+
+
+def dice_per_class(preds: torch.Tensor, targets: torch.Tensor, epsilon: float = 1e-6) -> list[float]:
+    """
+    Compute Dice score per class separately.
+
+    Returns:
+        list of dice values (len = C)
+    """
+    preds = torch.sigmoid(preds)
+    preds = (preds > 0.5).float()
+
+    intersection = (preds * targets).sum(dim=(0, 2, 3))
+    union = preds.sum(dim=(0, 2, 3)) + targets.sum(dim=(0, 2, 3))
+
+    dice = (2. * intersection + epsilon) / (union + epsilon)
+    return dice.cpu().tolist()

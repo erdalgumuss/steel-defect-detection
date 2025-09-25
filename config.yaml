@@ -19,6 +19,8 @@ training:
 model:
   backbone: "resnet18"
   pretrained: true
+  decoder_mode: "add"    # add | concat
+
 
 logging:
   output_dir: "outputs/"

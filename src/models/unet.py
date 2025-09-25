@@ -10,8 +10,9 @@ class UNetResNet18(nn.Module):
     Output: (B, num_classes, H, W)
     """
 
-    def __init__(self, num_classes: int = 4, pretrained: bool = True):
+    def __init__(self, num_classes: int = 4, pretrained: bool = True, decoder_mode: str = "add"):
         super().__init__()
+        self.decoder_mode = decoder_mode
         base_model = models.resnet18(weights="IMAGENET1K_V1" if pretrained else None)
 
         # ----- Encoder -----
@@ -27,6 +28,13 @@ class UNetResNet18(nn.Module):
         self.up2 = self._up_block(128, 64)
         self.up1 = self._up_block(64, 64)
 
+        # Channel reducers (sadece concat modunda gerekli)
+        if self.decoder_mode == "concat":
+            self.red4 = nn.Conv2d(256 + 256, 256, kernel_size=1)
+            self.red3 = nn.Conv2d(128 + 128, 128, kernel_size=1)
+            self.red2 = nn.Conv2d(64 + 64, 64, kernel_size=1)
+            self.red1 = nn.Conv2d(64 + 64, 64, kernel_size=1)
+
         # ----- Final conv -----
         self.final = nn.Conv2d(64, num_classes, kernel_size=1)
 
@@ -39,6 +47,13 @@ class UNetResNet18(nn.Module):
             nn.ReLU(inplace=True)
         )
 
+    def _skip_connect(self, up: torch.Tensor, enc: torch.Tensor, reducer: nn.Module | None = None) -> torch.Tensor:
+        if self.decoder_mode == "add":
+            return up + enc
+        else:  # concat
+            x = torch.cat([up, enc], dim=1)
+            return reducer(x)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # ----- Encoder -----
         e1 = self.enc1(x)
@@ -48,10 +63,10 @@ class UNetResNet18(nn.Module):
         e5 = self.enc5(e4)
 
         # ----- Decoder (skip connections) -----
-        d4 = self.up4(e5) + e4
-        d3 = self.up3(d4) + e3
-        d2 = self.up2(d3) + e2
-        d1 = self.up1(d2) + e1
+        d4 = self._skip_connect(self.up4(e5), e4, getattr(self, "red4", None))
+        d3 = self._skip_connect(self.up3(d4), e3, getattr(self, "red3", None))
+        d2 = self._skip_connect(self.up2(d3), e2, getattr(self, "red2", None))
+        d1 = self._skip_connect(self.up1(d2), e1, getattr(self, "red1", None))
 
         out = self.final(d1)          # (B, C, H/2, W/2)
         out = self.upsample_out(out)  # (B, C, H, W)

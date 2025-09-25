@@ -10,6 +10,7 @@ from data.dataset import SteelDefectDataset, build_full_dataframe
 from data.transforms import get_train_transforms, get_valid_transforms
 from models.unet import UNetResNet18
 from engines.training_engine import train_one_epoch, validate_one_epoch
+from sklearn.model_selection import train_test_split
 
 
 def main(config_path: str = "config.yaml"):
@@ -23,8 +24,19 @@ def main(config_path: str = "config.yaml"):
 
     full_df = build_full_dataframe(train_csv, image_dir)
 
+    # Train / Valid Split
+    train_ids, valid_ids = train_test_split(
+        full_df["ImageId"].unique(),
+        test_size=cfg["data"]["val_split"],
+        random_state=42,
+        shuffle=True
+    )
+
+    train_df = full_df[full_df["ImageId"].isin(train_ids)].reset_index(drop=True)
+    valid_df = full_df[full_df["ImageId"].isin(valid_ids)].reset_index(drop=True)
+
     train_ds = SteelDefectDataset(
-        full_df,
+        train_df,
         image_dir,
         shape=(cfg["data"]["image_height"], cfg["data"]["image_width"]),
         num_classes=cfg["data"]["num_classes"],
@@ -32,12 +44,13 @@ def main(config_path: str = "config.yaml"):
     )
 
     valid_ds = SteelDefectDataset(
-        full_df,
+        valid_df,
         image_dir,
         shape=(cfg["data"]["image_height"], cfg["data"]["image_width"]),
         num_classes=cfg["data"]["num_classes"],
         transforms=get_valid_transforms(cfg["data"]["image_height"], cfg["data"]["image_width"])
     )
+
 
     train_loader = DataLoader(
         train_ds,
@@ -66,7 +79,9 @@ def main(config_path: str = "config.yaml"):
     # ---- Model ----
     model = UNetResNet18(
         num_classes=cfg["data"]["num_classes"],
-        pretrained=cfg["model"]["pretrained"]
+        pretrained=cfg["model"]["pretrained"],
+        decoder_mode=cfg["model"].get("decoder_mode", "add")  # 👈 ekleme
+
     ).to(device)
 
     # ---- Optimizer ----
@@ -87,6 +102,7 @@ def main(config_path: str = "config.yaml"):
 
         print(f"Train Loss: {train_metrics['loss']:.4f} | Train Dice: {train_metrics['dice']:.4f}")
         print(f"Valid Loss: {valid_metrics['loss']:.4f} | Valid Dice: {valid_metrics['dice']:.4f}")
+        print(f"Train samples: {len(train_df)}, Valid samples: {len(valid_df)}")
 
         # 🔥 history kaydı
         history["train"].append(train_metrics)
