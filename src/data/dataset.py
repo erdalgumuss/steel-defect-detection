@@ -10,24 +10,18 @@ from torch.utils.data import Dataset
 from .rle_decoder import build_multilabel_mask
 
 from glob import glob
-
+# src/data/dataset.py
 class SteelDefectDataset(Dataset):
-    """
-    PyTorch Dataset for steel defect segmentation with multilabel (4 channels) masks.
-
-    Expects a DataFrame with columns: ['ImageId', 'ClassId', 'EncodedPixels'] where each ImageId
-    may have up to 4 rows (ClassId in {1..4}).
-    """
-
     def __init__(self,
                  df: pd.DataFrame,
                  image_dir: str,
-                 shape: Tuple[int, int] = (256, 1600),
+                 shape: Tuple[int, int],          # 🔥 config’ten direkt alınıyor
                  num_classes: int = 4,
                  transforms=None,
                  cache_dir: str | None = None,
                  assume_fortran_order: bool = True,
-                 load_rgb: bool = True):
+                 load_rgb: bool = True,
+                 force_resize: bool = False):     # 🔥 yeni param
         super().__init__()
         self.df = df.copy()
         self.image_dir = image_dir
@@ -37,15 +31,14 @@ class SteelDefectDataset(Dataset):
         self.cache_dir = cache_dir
         self.order = 'F' if assume_fortran_order else 'C'
         self.load_rgb = load_rgb
+        self.force_resize = force_resize
 
         if self.cache_dir:
             os.makedirs(self.cache_dir, exist_ok=True)
 
-        # Ensure ClassId exists; if not, create NaNs (for empty merges)
         if 'ClassId' not in self.df.columns:
             self.df['ClassId'] = np.nan
 
-        # Group rows per ImageId for fast indexing
         self.groups: List[tuple[str, pd.DataFrame]] = list(self.df.groupby('ImageId'))
 
     def __len__(self) -> int:
@@ -57,59 +50,45 @@ class SteelDefectDataset(Dataset):
         if img is None:
             raise FileNotFoundError(f"Image not found: {path}")
         if self.load_rgb:
-            img = np.repeat(img[..., None], 3, axis=2)  # (H, W, 3)
+            img = np.repeat(img[..., None], 3, axis=2)  # (H,W,3)
         return img
 
-    def _mask_cache_path(self, image_id: str) -> str:
-        if not self.cache_dir:
-            return ""
-        base = os.path.splitext(image_id)[0]
-        h, w = self.shape
-        return os.path.join(self.cache_dir, f"{base}_{h}x{w}_{self.num_classes}c_{self.order}.npz")
-
     def _read_mask(self, image_id: str, rows_for_image: pd.DataFrame) -> np.ndarray:
-        if self.cache_dir:
-            cpath = self._mask_cache_path(image_id)
-            if os.path.exists(cpath):
-                return np.load(cpath)['mask']  # (C, H, W)
-
-        mask = build_multilabel_mask(rows_for_image, shape=self.shape, num_classes=self.num_classes, order=self.order)
-
-        if self.cache_dir:
-            np.savez_compressed(cpath, mask=mask)
+        mask = build_multilabel_mask(rows_for_image,
+                                     shape=self.shape,
+                                     num_classes=self.num_classes,
+                                     order=self.order)
         return mask
 
     def __getitem__(self, idx: int):
         image_id, rows = self.groups[idx]
         img = self._read_image(image_id)
-        mask = self._read_mask(image_id, rows)  # (C, H, W)
+        mask = self._read_mask(image_id, rows)  # (C,H,W)
 
-        # Albumentations expects mask as HWC
-        mask_hwc = np.transpose(mask, (1, 2, 0))  # (H, W, C)
+        mask_hwc = np.transpose(mask, (1,2,0))  # (H,W,C)
 
-        # 🔥 Fix: img ve mask boyutlarını eşitle
+        # 🔥 Boyut check
         if img.shape[:2] != mask_hwc.shape[:2]:
-            mask_hwc = cv2.resize(
-                mask_hwc,
-                (img.shape[1], img.shape[0]),   # (W, H)
-                interpolation=cv2.INTER_NEAREST
-            )
+            if self.force_resize:
+                mask_hwc = cv2.resize(mask_hwc, (img.shape[1], img.shape[0]),
+                                      interpolation=cv2.INTER_NEAREST)
+            else:
+                raise ValueError(f"Image/mask size mismatch: "
+                                 f"img={img.shape[:2]}, mask={mask_hwc.shape[:2]}, id={image_id}")
 
         if self.transforms is not None:
             out = self.transforms(image=img, mask=mask_hwc)
             img, mask_hwc = out['image'], out['mask']
         else:
-            import torch
-            img = torch.from_numpy(img.transpose(2, 0, 1)).float()
+            img = torch.from_numpy(img.transpose(2,0,1)).float()
             mask_hwc = torch.from_numpy(mask_hwc).float()
 
         if isinstance(mask_hwc, np.ndarray):
-            mask = torch.from_numpy(np.transpose(mask_hwc, (2, 0, 1))).float()
+            mask = torch.from_numpy(np.transpose(mask_hwc,(2,0,1))).float()
         else:
-            mask = mask_hwc.permute(2, 0, 1).float()
+            mask = mask_hwc.permute(2,0,1).float()
 
-        meta = {"image_id": image_id}
-        return img, mask, meta
+        return img, mask, {"image_id": image_id}
 
 
 # --------- Convenience function for building a merged df (optional) ---------

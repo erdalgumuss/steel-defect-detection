@@ -5,7 +5,6 @@ import pandas as pd
 import shutil
 from pathlib import Path
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from config import Config
@@ -49,13 +48,14 @@ def main(config_path: str = "config.yaml"):
 
     full_df = build_full_dataframe(train_csv, image_dir)
 
-    # Train / Valid Split
-    train_ids, valid_ids = train_test_split(
-        full_df["ImageId"].unique(),
-        test_size=cfg["data"]["val_split"],
-        random_state=42,
-        shuffle=True
-    )
+       # ---- Train / Valid Split (txt dosyalarından okuma) ----
+    splits_dir = cfg["data"]["split_dir"]
+
+    with open(os.path.join(splits_dir, "train.txt")) as f:
+        train_ids = f.read().splitlines()
+    with open(os.path.join(splits_dir, "val.txt")) as f:
+        valid_ids = f.read().splitlines()
+
 
     train_df = full_df[full_df["ImageId"].isin(train_ids)].reset_index(drop=True)
     valid_df = full_df[full_df["ImageId"].isin(valid_ids)].reset_index(drop=True)
@@ -145,7 +145,7 @@ def main(config_path: str = "config.yaml"):
         train_metrics = train_one_epoch(model, train_loader, optimizer, device)
         valid_metrics = validate_one_epoch(model, valid_loader, device)
 
-        # Add LR info to metrics
+        # Add LR info
         current_lr = optimizer.param_groups[0]["lr"]
         train_metrics["lr"] = current_lr
         valid_metrics["lr"] = current_lr
@@ -158,14 +158,14 @@ def main(config_path: str = "config.yaml"):
         history["train"].append(train_metrics)
         history["valid"].append(valid_metrics)
 
-        # Best model kaydı
+        # Best model save
         if valid_metrics["dice"] > best_dice:
             best_dice = valid_metrics["dice"]
             os.makedirs(cfg["logging"]["output_dir"], exist_ok=True)
             torch.save(model.state_dict(), best_path)
             print(f"Best model updated at epoch {epoch+1}: {best_path}")
 
-        # LR scheduler step
+        # LR scheduler
         scheduler.step(valid_metrics["dice"])
 
         # Early stopping
@@ -174,14 +174,14 @@ def main(config_path: str = "config.yaml"):
             print("Early stopping triggered.")
             break
 
-        # Periyodik checkpoint kaydetme
+        # Periodic checkpoint
         if (epoch + 1) % cfg["logging"]["save_every"] == 0:
             os.makedirs(cfg["logging"]["checkpoint_dir"], exist_ok=True)
             ckpt_path = os.path.join(cfg["logging"]["checkpoint_dir"], f"model_epoch{epoch+1}.pth")
             torch.save(model.state_dict(), ckpt_path)
             print(f"Checkpoint saved: {ckpt_path}")
 
-    # ---- Save Final Model (copy of best) ----
+    # ---- Save Final Model ----
     os.makedirs(cfg["logging"]["output_dir"], exist_ok=True)
     final_path = os.path.join(cfg["logging"]["output_dir"], "model_final.pth")
     if os.path.exists(best_path):
@@ -196,6 +196,7 @@ def main(config_path: str = "config.yaml"):
     with open(history_path, "w") as f:
         json.dump(history, f, indent=4)
     print(f"History saved: {history_path}")
+
     # ---- Save Plots ----
     plot_history(history, out_dir=cfg["logging"]["output_dir"])
     print(f"Plots saved to {cfg['logging']['output_dir']}")

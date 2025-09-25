@@ -7,6 +7,7 @@ data:
   image_height: 256
   image_width: 1600 #1600
   num_classes: 4
+  split_dir: "data/processed/splits"
 
 training:
   batch_size: 2
