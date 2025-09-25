@@ -19,6 +19,7 @@ def evaluate(config_path: str = "config.yaml", checkpoint: str = None, num_sampl
     # ---- Config ----
     cfg = Config(config_path).dict
     device = cfg["training"]["device"] if torch.cuda.is_available() else "cpu"
+    device = cfg["training"]["device"] if torch.cuda.is_available() else "cpu"
 
     # ---- Dataset ----
     train_csv = pd.read_csv(cfg["data"]["train_csv"])

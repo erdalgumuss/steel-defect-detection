@@ -18,4 +18,5 @@ RUN pip install --upgrade pip \
 # Kodları kopyala
 COPY . .
 # Konteynerin dışarıya açacağı portu belirliyoruz (Jupyter için).
-EXPOSE 8888
+# Hem Jupyter hem Streamlit için portları aç
+EXPOSE 8888 8501

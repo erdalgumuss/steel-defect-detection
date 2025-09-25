@@ -7,7 +7,8 @@ services:
     volumes:
       - .:/app
     ports:
-      - "8888:8888"
+      - "8888:8888"   # Jupyter
+      - "8501:8501"   # Streamlit
     shm_size: '8gb'       # paylaşılan bellek artırma
     tmpfs:                # /dev/shm mount
       - /dev/shm:rw,nosuid,nodev,size=8g
@@ -19,6 +20,7 @@ services:
 ###### ######(Bad Practice :( )   
 #Docker Terminaline Bağlanma
 # Docker konteynerleri izole birer ortam. İçine girip komut çalıştırmak için şu komutu kullan:
+# PYTHONPATH=src streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0
 
 # Bash
 

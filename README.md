@@ -92,6 +92,9 @@ concat modu: Encoder ve decoder feature map’leri kanal boyutu boyunca birleşt
 - **Focal Loss** → Class imbalance için odaklanma
 - Kombinasyon: Dice + Focal desteklenebilir
 
+**Not:** Loss fonksiyonları, düşük epoch sayılarında dengesiz sınıfları hızlı öğrenmeyi teşvik edecek şekilde ağırlıklandırılmıştır.  
+Bu tercih, mevcut donanım kısıtları nedeniyle yapılmıştır. Yüksek tekrarlı eğitim imkânı olduğunda, daha nötr/odaksız bir loss kullanımı modelin bağımsız şekilde ağırlıkları öğrenmesini ve genelleştirmesini güçlendirebilir.
+
 ### 🔹 4. Metrikler
 
 - **Dice Coefficient** (class-level + mean)
