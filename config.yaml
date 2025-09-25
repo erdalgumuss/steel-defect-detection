@@ -15,6 +15,16 @@ training:
   learning_rate: 1e-4
   weight_decay: 1e-5
   device: "cuda"
+  
+scheduler:
+  mode: "max"            # valid dice için max
+  factor: 0.5            # LR azaltma oranı
+  patience: 2            # kaç epoch beklesin
+  verbose: true
+
+early_stopping:
+  patience: 5            # valid dice iyileşmezse dur
+  mode: "max"
 
 model:
   backbone: "resnet18"
