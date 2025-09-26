@@ -195,11 +195,17 @@ python src/main.py
 
 ## 🔮 Gelecek Çalışmalar
 
-* ⚡ Daha güçlü encoder (EfficientNet, Swin Transformer)
-* 🧪 Multi-loss denemeleri (Lovasz, Tversky)
-* 🚀 Streamlit / Gradio UI ile demo
-* ☁️ Kaggle Kernel + GPU destekli eğitim
+Bu projeyi görsel modellemelere başlangıç noktası olarak görüyorum. Gelecekte özellikle:
 
+🧠 Transformer tabanlı mimarilere (ör. Swin Transformer, Vision Transformer) odaklanarak daha güçlü ve genelleştirilebilir çözümler geliştirmeyi,
+
+🏭 Endüstride gerçek iş problemlerine doğrudan uygulanabilir modeller üretmeyi,
+
+🔄 Veri hazırlığından modele, metrik analizinden deploy aşamasına kadar uçtan uca projeler tasarlamayı,
+
+hedefliyorum.
+
+Amacım sadece yüksek doğruluklu modeller inşa etmek değil; aynı zamanda bana yeni şeyler öğretecek, sektörde değer yaratacak çözümler üzerinde çalışmak. Bu nedenle ilerideki projelerim hem teknik olarak daha ileri mimariler içerecek, hem de gerçek dünya senaryolarına katkı sağlayacak şekilde kurgulanacak.
 ---
 
 ## 📌 Kaggle Linkleri
