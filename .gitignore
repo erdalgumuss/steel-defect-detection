@@ -43,7 +43,6 @@ ENV/
 # =========================
 *.log
 logs/
-outputs/
 wandb/
 mlruns/
 *.csv
