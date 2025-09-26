@@ -9,116 +9,77 @@
 
 ## 🎯 Proje Hakkında
 
-Bu proje, **çelik yüzey kusurlarının segmentasyonu** için geliştirilmiş bir **derin öğrenme pipeline** içerir. Amaç, endüstriyel kalite kontrol süreçlerinde kusurların otomatik tespitini sağlamaktır.
+Bu proje, **çelik yüzey kusurlarının tespiti ve segmentasyonu** için geliştirilmiş bir **derin öğrenme pipeline**’dır.
+Amaç, endüstriyel kalite kontrol süreçlerinde kusurların otomatik ve güvenilir şekilde belirlenmesini sağlamaktır.
 
-Model mimarisi olarak **U-Net** kullanılır ve **ResNet-18 encoder (ImageNet pretrained)** ile desteklenmiştir. Eğitim süreci, modern veri augmentasyonları, Dice + Focal kayıp fonksiyonları ve GPU hızlandırmalı bir PyTorch altyapısı ile gerçekleştirilir.
-
-Bu yapı yalnızca Severstal Steel Defect Detection veriseti için değil, **farklı endüstriyel segmentasyon görevleri** için de kolayca uyarlanabilir.
-
-Dengesiz sınıflar: Focal Loss (küçük sınıflara daha çok önem verir).
-
-Segmentasyon (piksel bazlı maske): Dice Loss (alanların ne kadar çakıştığını ölçer).
-Bu yüzden iki adet loss fonksiyonu kullanılmıştır.
+* Model: **U-Net**
+* Encoder: **ResNet-18 (ImageNet pretrained)**
+* Loss: **Dice + Focal kombinasyonu**
+* Framework: **PyTorch 2.x**
+* Veri seti: [Severstal Steel Defect Detection (Kaggle)](https://www.kaggle.com/c/severstal-steel-defect-detection)
 
 ---
 
-## ![Pipeline](image.png)
+## 🏗️ Pipeline
 
-Neden ResNet Encoder?
+![Pipeline](image.png)
 
-Feature extraction: ResNet-18, endüstride kanıtlanmış bir mimari. Özellikle skip-connection yapısı sayesinde derin ağlarda vanishing gradient sorununu çözer.
+**Akış:**
 
-Transfer learning: ImageNet üzerinde eğitilmiş ağırlıkları kullandığımızda, düşük seviye kenar/texture özellikleri daha hızlı öğrenilir. Bu da çelik yüzey kusurlarında avantaj sağlar.
-
-Performans/Verim Deengesi: ResNet-18 hem hafif, hem de güçlüdür → hızlı eğitim, düşük bellek kullanımı, endüstriyel uygulamalara uygunluk.
-
-🔀 Decoder Mode (add vs concat)
-
-add modu: Encoder ve decoder feature map’leri aynnı kanal boyutunda toplanır (up + skip). Daha hafif, daha az parametre → hızlı inference.
-
-concat modu: Encoder ve decoder feature map’leri kanal boyutu boyunca birleştirilir (torch.cat). Daha fazla bilgi taşır ama parametre sayısı ve bellek maliyeti artar.
-
-## Config dosyası üzerinden decoder_mode: "add" | "concat" seçilebilir.
-
-## 📂 Proje Yapısı
-
-```
-.
-├── Dockerfile
-├── README.md
-├── config.yaml              # Eğitim ve model ayarları
-├── configs/                 # Alternatif config senaryoları
-├── docker-compose.yml
-├── image.png                # Pipeline görseli
-├── notebooks/               # Jupyter notebooklar (keşif, test)
-│   └── 01-data-exploration.ipynb
-├── requirements.txt         # Gerekli kütüphaneler
-└── src/
-    ├── config.py            # Config loader (yaml -> dict)
-    ├── engines/             # Eğitim ve validasyon döngüleri
-    │   ├── training_engine.py
-    │   └── evaluation_engine.py
-    ├── losses/              # Kayıp fonksiyonları
-    │   ├── dice_loss.py
-    │   └── focal_loss.py
-    ├── main.py              # Ana çalıştırma dosyası (train loop)
-    ├── metrics/             # Metrikler
-    │   └── dice_coefficient.py
-    └── models/              # Model mimarileri
-        ├── backbones/       # ResNet, EfficientNet encoderlar
-        └── unet.py          # U-Net implementasyonu
-```
+1. **Veri** → Kaggle CSV & RLE maskeler → `.npz` çok-kanallı maskeler
+2. **Preprocessing** → Augmentasyon & split
+3. **Model** → U-Net + ResNet-18 encoder
+4. **Loss** → Dice + Focal Loss
+5. **Training** → Adam optimizer + LR Scheduler + Early Stopping
+6. **Evaluation** → Dice metriği, sınıf bazlı raporlar
 
 ---
 
-## 🏗️ Pipeline Akışı
+## 🧠 Metodoloji
 
-### 🔹 1. Veri
+### 🔹 Veri
 
-- **Dataset**: Kaggle [Severstal: Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
-- **Format**: RLE maskeler → çok kanallı maskelere dönüştürülür (4 class).
-- **Dataset class**: `SteelDefectDataset` (`src/data/dataset.py`)
-- **Augmentasyon**: Albumentations kütüphanesi (crop, flip, affine, blur, brightness/contrast, normalize)
+* **Format**: Her görsel için 4 ayrı sınıf (maskeler `.npz` formatına dönüştürüldü).
+* **Augmentasyon**: Albumentations → crop, flip, affine, blur, brightness/contrast.
+* **Split**: Stratified train/val split (`preprocess.py`).
 
-### 🔹 2. Model
+### 🔹 Model
 
-- **U-Net** + **ResNet-18 encoder** (ImageNet pretrained)
-- Encoder-decoder yapısı modüler
-- Çok kanallı (4 sınıf) çıkış
+* **Neden ResNet-18?**
 
-### 🔹 3. Loss Fonksiyonları
+  * ✅ *Feature extraction*: Endüstride kanıtlanmış bir encoder.
+  * ✅ *Transfer learning*: ImageNet pretrained ağırlıkları ile daha hızlı öğrenme.
+  * ✅ *Hafiflik*: Eğitim süresi kısa, GPU bellek dostu.
 
-- **Dice Loss** → Overlap ölçümü
-- **Focal Loss** → Class imbalance için odaklanma
-- Kombinasyon: Dice + Focal desteklenebilir
+* **Decoder Mode Seçenekleri:**
 
-**Not:** Loss fonksiyonları, düşük epoch sayılarında dengesiz sınıfları hızlı öğrenmeyi teşvik edecek şekilde ağırlıklandırılmıştır.  
-Bu tercih, mevcut donanım kısıtları nedeniyle yapılmıştır. Yüksek tekrarlı eğitim imkânı olduğunda, daha nötr/odaksız bir loss kullanımı modelin bağımsız şekilde ağırlıkları öğrenmesini ve genelleştirmesini güçlendirebilir.
+  * `add`: Hafif, hızlı, az parametreli.
+  * `concat`: Daha zengin bilgi, fakat daha fazla parametre ve bellek kullanımı.
 
-### 🔹 4. Metrikler
+### 🔹 Loss Fonksiyonları
 
-- **Dice Coefficient** (class-level + mean)
-- Notebooklarda görsel test ve loss/metric değerlendirmesi
+* **Dice Loss** → Piksel bazlı overlap ölçümü
+* **Focal Loss** → Class imbalance problemine çözüm
+* **Combo Loss (WeightedFocalDiceLoss)** → iki loss’un birleşimi
 
-### 🔹 5. Eğitim Döngüsü
+### 🔹 Metrikler
 
-- `train_one_epoch` ve `validate_one_epoch` (src/engines/)
-- Adam optimizer, weight decay, learning rate config üzerinden yönetilir
-- Checkpoint kaydı ve final model kaydı
+* **Dice Coefficient (mean + per-class)**
 
 ---
 
 ## ⚙️ Config Yönetimi
 
-Tüm parametreler **config.yaml** üzerinden yönetilir. Örnek:
+Tüm parametreler `config.yaml` üzerinden yönetilir:
 
 ```yaml
 experiment_name: "steel_defect_unet_resnet18"
 
 data:
-  train_csv: "data/train.csv"
-  train_images_dir: "data/train_images"
-  val_split: 0.2
+  train_csv: "data/raw/train.csv"
+  train_images_dir: "data/raw/train_images"
+  mask_dir: "data/processed/masks_npz"
+  split_dir: "data/processed/splits"
   image_height: 256
   image_width: 1600
   num_classes: 4
@@ -152,45 +113,101 @@ logging:
 pip install -r requirements.txt
 ```
 
-veya Docker ile:
+veya Docker:
 
 ```bash
 docker build -t steel-defect-detection .
 docker run -it steel-defect-detection
 ```
 
-### 2️⃣ Eğitim
+### 2️⃣ Veri Hazırlığı
+
+```bash
+python src/scripts/preprocess.py \
+  --data_dir data/raw \
+  --out_dir data/processed \
+  --save_masks npz \
+  --make_splits
+```
+
+### 3️⃣ Eğitim
 
 ```bash
 python src/main.py
 ```
 
-### 3️⃣ Çıktılar
+### 4️⃣ Çıktılar
 
-- `checkpoints/` → her N epoch’ta model checkpointleri
-- `outputs/model_final.pth` → final model
+* `checkpoints/` → periyodik checkpointler
+* `outputs/model_final.pth` → final model
+* `outputs/history.json` → loss & dice geçmişi
+* `outputs/*.png` → loss/dice grafik görselleri
 
-### 4️⃣ Notebook Keşfi
+---
+
+## 📊 Örnek Sonuçlar
+
+* Eğitim & validasyon loss eğrileri
+* Class-level dice skorları
+* Overlay görseller (kusurlar işaretlenmiş)
+
+👉 Notebook: `notebooks/01-data-exploration.ipynb`
+
+---
+
+## 📂 Repo Yapısı
 
 ```bash
-jupyter notebook notebooks/01-data-exploration.ipynb
+.
+├── Dockerfile
+├── README.md
+├── config.yaml              # Eğitim ve model ayarları
+├── configs/                 # Alternatif config senaryoları
+├── docker-compose.yml
+├── image.png                # Pipeline görseli
+├── notebooks/               # Notebooklar
+│   └── 01-data-exploration.ipynb
+├── requirements.txt         # Gerekli kütüphaneler
+└── src/
+    ├── config.py            # Config loader
+    ├── engines/             # Eğitim ve validasyon döngüleri
+    ├── losses/              # Loss fonksiyonları
+    ├── main.py              # Eğitim başlatma
+    ├── metrics/             # Dice metriği
+    ├── models/              # Model mimarileri
+    ├── data/                # Dataset & transformlar
+    └── scripts/             # Preprocessing
 ```
 
 ---
 
-## 📊 Özellikler
+## ✅ Proje Özellikleri
 
-- ✅ U-Net + ResNet18 encoder
-- ✅ Çok kanallı maskeler (4 class)
-- ✅ Dice + Focal Loss kombinasyonu
-- ✅ Dice metriği (ortalama + class-level)
-- ✅ Albumentations ile güçlü augmentasyon
-- ✅ Config tabanlı esnek yönetim
-- ✅ Docker ile taşınabilirlik
+* ✅ U-Net + ResNet18 encoder
+* ✅ Çok-kanallı maskeler (4 class)
+* ✅ Dice + Focal Loss kombinasyonu
+* ✅ Stratified train/val split
+* ✅ Albumentations augmentasyonları
+* ✅ Config tabanlı esnek yönetim
+* ✅ Docker desteği
 
 ---
 
-## 📌 Kaynaklar
+## 🔮 Gelecek Çalışmalar
 
-- Kaggle Competition: [Severstal: Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
-- Endüstriyel yüzey kalite kontrol literatürü
+* ⚡ Daha güçlü encoder (EfficientNet, Swin Transformer)
+* 🧪 Multi-loss denemeleri (Lovasz, Tversky)
+* 🚀 Streamlit / Gradio UI ile demo
+* ☁️ Kaggle Kernel + GPU destekli eğitim
+
+---
+
+## 📌 Kaggle Linkleri
+
+* [Severstal Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
+
+---
+
+## 📜 Lisans
+
+MIT License
