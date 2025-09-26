@@ -12,11 +12,11 @@
 Bu proje, **çelik yüzey kusurlarının tespiti ve segmentasyonu** için geliştirilmiş bir **derin öğrenme pipeline**’dır.
 Amaç, endüstriyel kalite kontrol süreçlerinde kusurların otomatik ve güvenilir şekilde belirlenmesini sağlamaktır.
 
-* Model: **U-Net**
-* Encoder: **ResNet-18 (ImageNet pretrained)**
-* Loss: **Dice + Focal kombinasyonu**
-* Framework: **PyTorch 2.x**
-* Veri seti: [Severstal Steel Defect Detection (Kaggle)](https://www.kaggle.com/c/severstal-steel-defect-detection)
+- Model: **U-Net**
+- Encoder: **ResNet-18 (ImageNet pretrained)**
+- Loss: **Dice + Focal kombinasyonu**
+- Framework: **PyTorch 2.x**
+- Veri seti: [Severstal Steel Defect Detection (Kaggle)](https://www.kaggle.com/c/severstal-steel-defect-detection)
 
 ---
 
@@ -39,32 +39,32 @@ Amaç, endüstriyel kalite kontrol süreçlerinde kusurların otomatik ve güven
 
 ### 🔹 Veri
 
-* **Format**: Her görsel için 4 ayrı sınıf (maskeler `.npz` formatına dönüştürüldü).
-* **Augmentasyon**: Albumentations → crop, flip, affine, blur, brightness/contrast.
-* **Split**: Stratified train/val split (`preprocess.py`).
+- **Format**: Her görsel için 4 ayrı sınıf (maskeler `.npz` formatına dönüştürüldü).
+- **Augmentasyon**: Albumentations → crop, flip, affine, blur, brightness/contrast.
+- **Split**: Stratified train/val split (`preprocess.py`).
 
 ### 🔹 Model
 
-* **Neden ResNet-18?**
+- **Neden ResNet-18?**
 
-  * ✅ *Feature extraction*: Endüstride kanıtlanmış bir encoder.
-  * ✅ *Transfer learning*: ImageNet pretrained ağırlıkları ile daha hızlı öğrenme.
-  * ✅ *Hafiflik*: Eğitim süresi kısa, GPU bellek dostu.
+  - ✅ _Feature extraction_: Endüstride kanıtlanmış bir encoder.
+  - ✅ _Transfer learning_: ImageNet pretrained ağırlıkları ile daha hızlı öğrenme.
+  - ✅ _Hafiflik_: Eğitim süresi kısa, GPU bellek dostu.
 
-* **Decoder Mode Seçenekleri:**
+- **Decoder Mode Seçenekleri:**
 
-  * `add`: Hafif, hızlı, az parametreli.
-  * `concat`: Daha zengin bilgi, fakat daha fazla parametre ve bellek kullanımı.
+  - `add`: Hafif, hızlı, az parametreli.
+  - `concat`: Daha zengin bilgi, fakat daha fazla parametre ve bellek kullanımı.
 
 ### 🔹 Loss Fonksiyonları
 
-* **Dice Loss** → Piksel bazlı overlap ölçümü
-* **Focal Loss** → Class imbalance problemine çözüm
-* **Combo Loss (WeightedFocalDiceLoss)** → iki loss’un birleşimi
+- **Dice Loss** → Piksel bazlı overlap ölçümü
+- **Focal Loss** → Class imbalance problemine çözüm
+- **Combo Loss (WeightedFocalDiceLoss)** → iki loss’un birleşimi
 
 ### 🔹 Metrikler
 
-* **Dice Coefficient (mean + per-class)**
+- **Dice Coefficient (mean + per-class)**
 
 ---
 
@@ -95,7 +95,7 @@ training:
 model:
   backbone: "resnet18"
   pretrained: true
-  decoder_mode: "add"   # veya "concat"
+  decoder_mode: "add" # veya "concat"
 
 logging:
   output_dir: "outputs/"
@@ -138,18 +138,18 @@ python src/main.py
 
 ### 4️⃣ Çıktılar
 
-* `checkpoints/` → periyodik checkpointler
-* `outputs/model_final.pth` → final model
-* `outputs/history.json` → loss & dice geçmişi
-* `outputs/*.png` → loss/dice grafik görselleri
+- `checkpoints/` → periyodik checkpointler
+- `outputs/model_final.pth` → final model
+- `outputs/history.json` → loss & dice geçmişi
+- `outputs/*.png` → loss/dice grafik görselleri
 
 ---
 
 ## 📊 Örnek Sonuçlar
 
-* Eğitim & validasyon loss eğrileri
-* Class-level dice skorları
-* Overlay görseller (kusurlar işaretlenmiş)
+- Eğitim & validasyon loss eğrileri
+- Class-level dice skorları
+- Overlay görseller (kusurlar işaretlenmiş)
 
 👉 Notebook: `notebooks/01-data-exploration.ipynb`
 
@@ -183,13 +183,13 @@ python src/main.py
 
 ## ✅ Proje Özellikleri
 
-* ✅ U-Net + ResNet18 encoder
-* ✅ Çok-kanallı maskeler (4 class)
-* ✅ Dice + Focal Loss kombinasyonu
-* ✅ Stratified train/val split
-* ✅ Albumentations augmentasyonları
-* ✅ Config tabanlı esnek yönetim
-* ✅ Docker desteği
+- ✅ U-Net + ResNet18 encoder
+- ✅ Çok-kanallı maskeler (4 class)
+- ✅ Dice + Focal Loss kombinasyonu
+- ✅ Stratified train/val split
+- ✅ Albumentations augmentasyonları
+- ✅ Config tabanlı esnek yönetim
+- ✅ Docker desteği
 
 ---
 
@@ -204,12 +204,14 @@ Bu projeyi görsel modellemelere başlangıç noktası olarak görüyorum. Gelec
 🔄 Veri hazırlığından modele, metrik analizinden deploy aşamasına kadar uçtan uca projeler tasarlamayı,
 
 hedefliyorum.
+
 Amacım sadece yüksek doğruluklu modeller inşa etmek değil; aynı zamanda bana yeni şeyler öğretecek, sektörde değer yaratacak çözümler üzerinde çalışmak. Bu nedenle ilerideki projelerim hem teknik olarak daha ileri mimariler içerecek, hem de gerçek dünya senaryolarına katkı sağlayacak şekilde kurgulanacak.
+
 ---
 
 ## 📌 Kaggle Linkleri
 
-* [Severstal Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
+- [Severstal Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
 
 ---
 
