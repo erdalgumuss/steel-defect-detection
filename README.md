@@ -205,15 +205,25 @@ Bu projeyi görsel modellemelere başlangıç noktası olarak görüyorum. Gelec
 
 hedefliyorum.
 
-Amacım sadece yüksek doğruluklu modeller inşa etmek değil; aynı zamanda bana yeni şeyler öğretecek, sektörde değer yaratacak çözümler üzerinde çalışmak. Bu nedenle ilerideki projelerim hem teknik olarak daha ileri mimariler içerecek, hem de gerçek dünya senaryolarına katkı sağlayacak şekilde kurgulanacak.
+## Amacım sadece yüksek doğruluklu modeller inşa etmek değil; aynı zamanda bana yeni şeyler öğretecek, sektörde değer yaratacak çözümler üzerinde çalışmak. Bu nedenle ilerideki projelerim hem teknik olarak daha ileri mimariler içerecek, hem de gerçek dünya senaryolarına katkı sağlayacak şekilde kurgulanacak.
+
+## 👤 Katılımcı Notu
+
+Ekibim ile güncel yapay zeka teknolojilerini takip edip, bu teknolojileri sektörlere uygulamak adına çözümler geliştiriyoruz.  
+Bu çözümlerin sahada uygulanabilir olması için sürekli sektörel takip yapıyor, özellikle **endüstri ve üretim hatlarının verimliliği** üzerine spesifik iş çözümleri üretiyor ve bunlar ile mantıksal çalışmalar ilerletiyoruz.
+
+---
+
+📌 Görüntü işleme noktasında ekibimizin yeterli olduğunu düşünsem de bir türlü odaklanamadığım bu konuya en azından bu bootcamp ile hızlı bir giriş yaptım.  
+Devamında daha derinlemesine, niş ve yerinde çözümler geliştirebileceğime olan inancımı pekiştirmiş oldum.
+
+✨ Benim için keyifli bir sınav gibiydi.
 
 ---
 
 ## 📌 Kaggle Linkleri
 
-- [Kagle Proje Linki](https://www.kaggle.com/code/uwhuwh/steel-defect-segmentation-unet)
-
-
+- [Kaggle Proje Linki](https://www.kaggle.com/code/uwhuwh/steel-defect-segmentation-unet)
 
 - [Severstal Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
 
