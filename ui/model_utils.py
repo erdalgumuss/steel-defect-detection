@@ -104,7 +104,7 @@ def resize_to_target(np_img: np.ndarray, h: int, w: int, keep_aspect: bool = Fal
     return canvas
 
 
-def load_model(checkpoint: str = "outputs/model_final.pth"):
+def load_model(checkpoint: str = "model/best_model.pth"):
     """Load trained UNetResNet18 model from outputs/ directory."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
 

@@ -43,6 +43,6 @@ Ardından tarayıcıda şu adrese gidin:
 ## ⚠️ Notlar
 
 - Eğer **OPENAI_API_KEY** yoksa uygulama çalışır, ancak GPT raporları gösterilmez
-- Model checkpoint dosyası (`model_final.pth`), `config.yaml` içinde belirtilen dizinde bulunmalıdır
+- Model checkpoint dosyası (`best_model.pth`), `steel-defect-detection/model/` içinde belirtilen dizinde bulunmalıdır
 
 ![Ekran Görüntüsü](image.png)
