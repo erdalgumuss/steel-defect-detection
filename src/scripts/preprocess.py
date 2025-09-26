@@ -12,7 +12,7 @@ import pandas as pd
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
-from src.data.rle_decoder import rle_to_mask
+from data.rle_decoder import rle_to_mask
 
 def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
