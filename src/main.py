@@ -1,14 +1,13 @@
 import os
 import json
 import torch
-import pandas as pd
 import shutil
 from pathlib import Path
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from config import Config
-from data.dataset import SteelDefectDataset, build_full_dataframe
+from data.dataset import SteelDefectDataset
 from data.transforms import get_train_transforms, get_valid_transforms
 from models.unet import UNetResNet18
 from engines.training_engine import train_one_epoch, validate_one_epoch
@@ -42,13 +41,9 @@ def main(config_path: str = "config.yaml"):
     device = cfg["training"]["device"] if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    # ---- Dataset ----
-    train_csv = pd.read_csv(cfg["data"]["train_csv"])
+    # ---- Dataset (split + npz masklerden okuma) ----
     image_dir = cfg["data"]["train_images_dir"]
-
-    full_df = build_full_dataframe(train_csv, image_dir)
-
-       # ---- Train / Valid Split (txt dosyalarından okuma) ----
+    mask_dir = cfg["data"]["mask_dir"]
     splits_dir = cfg["data"]["split_dir"]
 
     with open(os.path.join(splits_dir, "train.txt")) as f:
@@ -56,23 +51,17 @@ def main(config_path: str = "config.yaml"):
     with open(os.path.join(splits_dir, "val.txt")) as f:
         valid_ids = f.read().splitlines()
 
-
-    train_df = full_df[full_df["ImageId"].isin(train_ids)].reset_index(drop=True)
-    valid_df = full_df[full_df["ImageId"].isin(valid_ids)].reset_index(drop=True)
-
     train_ds = SteelDefectDataset(
-        train_df,
-        image_dir,
-        shape=(cfg["data"]["image_height"], cfg["data"]["image_width"]),
-        num_classes=cfg["data"]["num_classes"],
+        split_ids=train_ids,
+        image_dir=image_dir,
+        mask_dir=mask_dir,
         transforms=get_train_transforms(cfg["data"]["image_height"], cfg["data"]["image_width"])
     )
 
     valid_ds = SteelDefectDataset(
-        valid_df,
-        image_dir,
-        shape=(cfg["data"]["image_height"], cfg["data"]["image_width"]),
-        num_classes=cfg["data"]["num_classes"],
+        split_ids=valid_ids,
+        image_dir=image_dir,
+        mask_dir=mask_dir,
         transforms=get_valid_transforms(cfg["data"]["image_height"], cfg["data"]["image_width"])
     )
 
@@ -153,7 +142,7 @@ def main(config_path: str = "config.yaml"):
         print(f"Train Loss: {train_metrics['loss']:.4f} | Train Dice: {train_metrics['dice']:.4f}")
         print(f"Valid Loss: {valid_metrics['loss']:.4f} | Valid Dice: {valid_metrics['dice']:.4f}")
         print(f"Current LR: {current_lr:.6f}")
-        print(f"Train samples: {len(train_df)}, Valid samples: {len(valid_df)}")
+        print(f"Train samples: {len(train_ds)}, Valid samples: {len(valid_ds)}")
 
         history["train"].append(train_metrics)
         history["valid"].append(valid_metrics)

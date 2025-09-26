@@ -8,7 +8,8 @@ data:
   image_width: 1600 #1600
   num_classes: 4
   split_dir: "data/processed/splits"
-
+  mask_dir: "data/processed/masks_npz"
+  
 training:
   batch_size: 2
   num_workers: 2
