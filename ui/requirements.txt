@@ -1,0 +1,10 @@
+streamlit
+torch
+torchvision
+pillow
+opencv-python-headless
+albumentations
+numpy
+matplotlib
+python-dotenv
+openai

@@ -1,4 +1,4 @@
-# src/ui/app.py
+# ui/app.py
 import io
 import json
 import streamlit as st
@@ -15,10 +15,14 @@ def main():
     st.write("Upload an image and the trained model will predict segmentation masks and generate a GPT report.")
 
     # Modeli yükle
-    model, cfg, device = load_model()
+    try:
+        model, cfg, device = load_model()
+    except FileNotFoundError as e:
+        st.error(str(e))
+        return
 
     # Sidebar ayarları
-    st.sidebar.header("Settings")
+    st.sidebar.header("⚙️ Settings")
     threshold = st.sidebar.slider("Threshold", 0.1, 0.9, 0.5, 0.05)
     alpha = st.sidebar.slider("Mask Transparency", 0.1, 1.0, 0.4, 0.05)
     lang = st.sidebar.radio("Language", ["tr", "en"], index=0)
@@ -48,7 +52,7 @@ def main():
         )
 
         # Per-class masks
-        st.subheader("Per-Class Predictions")
+        st.subheader("📌 Per-Class Predictions")
         n_classes = masks.shape[0]
         cols = st.columns(n_classes)
         for i in range(n_classes):
@@ -56,7 +60,7 @@ def main():
                 st.image(masks[i] * 255, caption=f"Class {i+1}", clamp=True)
 
         # 🔥 GPT Raporu
-        st.subheader("LLM Analysis Report")
+        st.subheader("🤖 LLM Analysis Report")
         summary = compute_defect_summary(masks)
         summary["language"] = lang  # JSON’a ekledik
 
