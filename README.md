@@ -195,29 +195,27 @@ python src/main.py
 
 ## 🔮 Gelecek Çalışmalar
 
-Bu projeyi görsel modellemelere başlangıç noktası olarak görüyorum. Gelecekte özellikle:
+Bu projeyi görsel modellemelere bir başlangıç noktası olarak görüyorum. Gelecekte özellikle:
 
-🧠 Transformer tabanlı mimarilere (ör. Swin Transformer, Vision Transformer) odaklanarak daha güçlü ve genelleştirilebilir çözümler geliştirmeyi,
+- 🧠 **Transformer tabanlı mimarilere** (ör. *Swin Transformer, Vision Transformer*) odaklanarak daha güçlü ve genelleştirilebilir çözümler geliştirmeyi,  
+- 🏭 **Endüstride gerçek iş problemlerine doğrudan uygulanabilir modeller** üretmeyi,  
+- 🔄 **Uçtan uca projeler** tasarlamayı (veri hazırlığından modele, metrik analizinden deploy aşamasına kadar),  
 
-🏭 Endüstride gerçek iş problemlerine doğrudan uygulanabilir modeller üretmeyi,
+hedefliyorum.  
 
-🔄 Veri hazırlığından modele, metrik analizinden deploy aşamasına kadar uçtan uca projeler tasarlamayı,
-
-hedefliyorum.
-
-## Amacım sadece yüksek doğruluklu modeller inşa etmek değil; aynı zamanda bana yeni şeyler öğretecek, sektörde değer yaratacak çözümler üzerinde çalışmak. Bu nedenle ilerideki projelerim hem teknik olarak daha ileri mimariler içerecek, hem de gerçek dünya senaryolarına katkı sağlayacak şekilde kurgulanacak.
-
-## 👤 Katılımcı Notu
-
-Ekibim ile güncel yapay zeka teknolojilerini takip edip, bu teknolojileri sektörlere uygulamak adına çözümler geliştiriyoruz.  
-Bu çözümlerin sahada uygulanabilir olması için sürekli sektörel takip yapıyor, özellikle **endüstri ve üretim hatlarının verimliliği** üzerine spesifik iş çözümleri üretiyor ve bunlar ile mantıksal çalışmalar ilerletiyoruz.
+Amacım yalnızca yüksek doğruluklu modeller inşa etmek değil; aynı zamanda bana yeni şeyler öğretecek, sektörde değer yaratacak çözümler üzerinde çalışmak. Bu nedenle ilerideki projelerim hem teknik olarak ileri mimariler içerecek hem de gerçek dünya senaryolarına katkı sağlayacak şekilde kurgulanacak.  
 
 ---
 
-📌 Görüntü işleme noktasında ekibimizin yeterli olduğunu düşünsem de bir türlü odaklanamadığım bu konuya en azından bu bootcamp ile hızlı bir giriş yaptım.  
-Devamında daha derinlemesine, niş ve yerinde çözümler geliştirebileceğime olan inancımı pekiştirmiş oldum.
+## 👤 Katılımcı Notu
 
-✨ Benim için keyifli bir sınav gibiydi.
+Ekibim ile güncel yapay zeka teknolojilerini takip edip, bunları sektörlere uygulamak adına çözümler geliştiriyoruz.  
+Bu çözümlerin sahada uygulanabilir olması için sürekli sektörel takip yapıyor, özellikle **endüstri ve üretim hatlarının verimliliği** üzerine spesifik iş çözümleri üretiyor ve mantıksal çalışmalar ilerletiyoruz.  
+
+📌 Görüntü işleme noktasında ekibimizin yeterli olduğunu düşünsem de bir türlü odaklanamadığım bu konuya en azından bu bootcamp ile hızlı bir giriş yaptım.  
+Devamında daha derinlemesine, niş ve yerinde çözümler geliştirebileceğime olan inancımı pekiştirmiş oldum.  
+
+✨ Benim için keyifli bir sınav gibiydi.  
 
 ---
 
