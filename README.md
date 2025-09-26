@@ -197,9 +197,9 @@ python src/main.py
 
 Bu projeyi görsel modellemelere bir başlangıç noktası olarak görüyorum. Gelecekte özellikle:
 
-- 🧠 **Transformer tabanlı mimarilere** (ör. *Swin Transformer, Vision Transformer*) odaklanarak daha güçlü ve genelleştirilebilir çözümler geliştirmeyi,  
-- 🏭 **Endüstride gerçek iş problemlerine doğrudan uygulanabilir modeller** üretmeyi,  
-- 🔄 **Uçtan uca projeler** tasarlamayı (veri hazırlığından modele, metrik analizinden deploy aşamasına kadar),  
+-  **Transformer tabanlı mimarilere** (ör. *Swin Transformer, Vision Transformer*) odaklanarak daha güçlü ve genelleştirilebilir çözümler geliştirmeyi,  
+-  **Endüstride gerçek iş problemlerine doğrudan uygulanabilir modeller** üretmeyi,  
+-  **Uçtan uca projeler** tasarlamayı (veri hazırlığından modele, metrik analizinden deploy aşamasına kadar),  
 
 hedefliyorum.  
 
