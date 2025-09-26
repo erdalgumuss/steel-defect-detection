@@ -212,10 +212,10 @@ Amacım yalnızca yüksek doğruluklu modeller inşa etmek değil; aynı zamanda
 Ekibim ile güncel yapay zeka teknolojilerini takip edip, bunları sektörlere uygulamak adına çözümler geliştiriyoruz.  
 Bu çözümlerin sahada uygulanabilir olması için sürekli sektörel takip yapıyor, özellikle **endüstri ve üretim hatlarının verimliliği** üzerine spesifik iş çözümleri üretiyor ve mantıksal çalışmalar ilerletiyoruz.  
 
-📌 Görüntü işleme noktasında ekibimizin yeterli olduğunu düşünsem de bir türlü odaklanamadığım bu konuya en azından bu bootcamp ile hızlı bir giriş yaptım.  
+  Görüntü işleme noktasında ekibimizin yeterli olduğunu düşünsem de bir türlü odaklanamadığım bu konuya en azından bu bootcamp ile hızlı bir giriş yaptım.  
 Devamında daha derinlemesine, niş ve yerinde çözümler geliştirebileceğime olan inancımı pekiştirmiş oldum.  
 
-✨ Benim için keyifli bir sınav gibiydi.  
+  Benim için keyifli bir sınav gibiydi.  
 
 ---
 
