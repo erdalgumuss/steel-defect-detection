@@ -211,11 +211,9 @@ Amacım sadece yüksek doğruluklu modeller inşa etmek değil; aynı zamanda ba
 
 ## 📌 Kaggle Linkleri
 
-    Kagle proje linki:
+- [Kagle Proje Linki](https://www.kaggle.com/code/uwhuwh/steel-defect-segmentation-unet)
 
-- [Severstal Steel Defect Detection](https://www.kaggle.com/code/uwhuwh/steel-defect-segmentation-unet)
 
-  VeriSeti:
 
 - [Severstal Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
 
